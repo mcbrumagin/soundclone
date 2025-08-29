@@ -1,3 +1,76 @@
+const originalConsoleLog = console.log;
+console.log = function(...args) {
+    originalConsoleLog.apply(console, args); // Still log to the client console
+    const logMessage = JSON.stringify(args); // Prepare message for server
+
+    // Send to server
+    fetch('/log-endpoint', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: logMessage }),
+    }).catch(error => {
+        originalConsoleLog('Error sending log to server:', error);
+    });
+};
+
+const originalConsoleErr = console.error;
+console.error = function(...args) {
+    originalConsoleErr.apply(console, args); // Still log to the client console
+    args = args.map(arg => {
+        if (arg instanceof Error) return arg.message + '\nStack:\n ' + arg.stack;
+        else return arg;
+    });
+    const logMessage = JSON.stringify(args); // Prepare message for server
+
+    // Send to server
+    fetch('/log-endpoint', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: logMessage }),
+    }).catch(error => {
+        originalConsoleErr('Error sending log to server:', error);
+    });
+};
+
+console.log('test')
+
+function getAllSupportedMimeTypes(...mediaTypes) {
+    if (!mediaTypes.length) mediaTypes.push('video', 'audio')
+    const CONTAINERS = ['webm', 'ogg', 'mp3', 'mp4', 'x-matroska', '3gpp', '3gpp2', '3gp2', 'quicktime', 'mpeg', 'aac', 'flac', 'x-flac', 'wave', 'wav', 'x-wav', 'x-pn-wav', 'not-supported']
+    const CODECS = ['vp9', 'vp9.0', 'vp8', 'vp8.0', 'avc1', 'av1', 'h265', 'h.265', 'h264', 'h.264', 'opus', 'vorbis', 'pcm', 'aac', 'mpeg', 'mp4a', 'rtx', 'red', 'ulpfec', 'g722', 'pcmu', 'pcma', 'cn', 'telephone-event', 'not-supported']
+    
+    return [...new Set(
+      CONTAINERS.flatMap(ext =>
+          mediaTypes.flatMap(mediaType => [
+            `${mediaType}/${ext}`,
+          ]),
+      ),
+    ), ...new Set(
+      CONTAINERS.flatMap(ext =>
+        CODECS.flatMap(codec =>
+          mediaTypes.flatMap(mediaType => [
+            // NOTE: 'codecs:' will always be true (false positive)
+            `${mediaType}/${ext};codecs=${codec}`,
+          ]),
+        ),
+      ),
+    ), ...new Set(
+      CONTAINERS.flatMap(ext =>
+        CODECS.flatMap(codec1 =>
+        CODECS.flatMap(codec2 =>
+          mediaTypes.flatMap(mediaType => [
+            `${mediaType}/${ext};codecs="${codec1}, ${codec2}"`,
+          ]),
+        ),
+        ),
+      ),
+    )].filter(variation => MediaRecorder.isTypeSupported(variation))
+  }
+
 // Main application logic for SoundClone SPA
 document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements - Global
@@ -168,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             trackListElement.innerHTML = '<div class="loading-indicator">Loading tracks...</div>';
             
-            const tracks = await ApiService.getTracks();
+            const tracks = await ApiService.getTracks(); //NOTE--1
             renderTrackList(tracks);
         } catch (error) {
             console.error('Error loading tracks:', error);
@@ -834,7 +907,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Create form data for upload
             const formData = new FormData();
-            formData.append('audio', appState.recordingBlob, 'recording.webm');
+            formData.append('audio', appState.recordingBlob, 'recording.webm'); // TODO?
             formData.append('title', title);
             
             const description = recordDescriptionInput.value.trim();
@@ -887,10 +960,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle file selection in upload view
     function handleFileSelect(file) {
         // Check if file is audio
-        if (!file.type.match('audio/(mp3|wav)')) {
-            alert('Please select an MP3 or WAV file');
-            return;
-        }
+
+        console.log('TYPE: ' + file.type)
+        // if (!file.type.match('(mp3|wav)')) {
+        //     alert('Please select an MP3 or WAV file');
+        //     return;
+        // }
         
         appState.selectedFile = file;
         
@@ -905,6 +980,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Preview the audio
         const fileURL = URL.createObjectURL(file);
+        console.log('created fileUrl: ', fileURL);
         loadTrack({
             title: titleFromFile,
             audioUrl: fileURL
@@ -926,16 +1002,18 @@ document.addEventListener('DOMContentLoaded', function() {
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then(stream => {
                 // Create media recorder
-                appState.mediaRecorder = new MediaRecorder(stream);
+                appState.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
                 
                 // Set up event handlers
                 appState.mediaRecorder.ondataavailable = function(e) {
+                    console.log('ONDATA')
                     appState.audioChunks.push(e.data);
                 };
                 
                 appState.mediaRecorder.onstop = function() {
+                    console.log('ONSTOP');
                     // Create blob from chunks
-                    appState.recordingBlob = new Blob(appState.audioChunks, { type: 'audio/webm' });
+                    appState.recordingBlob = new Blob(appState.audioChunks, { type: 'audio/webm;codecs=opus' });
                     
                     // Create URL for the blob
                     if (appState.recordingUrl) {
@@ -943,6 +1021,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     appState.recordingUrl = URL.createObjectURL(appState.recordingBlob);
                     
+
+
+                    console.log('recordingUrl: ', appState.recordingUrl)
+
                     // Load as current track
                     loadTrack({
                         title: 'New Recording',
@@ -1021,9 +1103,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+
+    // console.log('aac support?', MediaRecorder.isTypeSupported('audio/aac'));
+    // console.log('ogg support?', MediaRecorder.isTypeSupported('audio/ogg'));
+    // console.log('flac support?', MediaRecorder.isTypeSupported('audio/flac'));
+    // console.log('mp4 support?', MediaRecorder.isTypeSupported('audio/mp4'));
+    // console.log('webm support?', MediaRecorder.isTypeSupported('audio/webm'));
+    // console.log('mp3 support?', MediaRecorder.isTypeSupported('audio/mp3'));
+    // console.log('wav support?', MediaRecorder.isTypeSupported('audio/wav'));
+    // console.log('mpeg support?', MediaRecorder.isTypeSupported('audio/mpeg'));
+
+    console.log(getAllSupportedMimeTypes('audio'))
+    
     // Load a track into the player without playing
     function loadTrack(track, autoplay = false) {
+        console.log('loadTrack: ', track);
+
+        // let err = new Error('test');
+        // console.error(err);
+
         appState.currentTrack = track;
+        console.log('audioPlayer src: ', track.audioUrl)
         audioPlayer.src = track.audioUrl;
         playerTrackTitle.textContent = track.title;
         
@@ -1033,11 +1133,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Autoplay if requested
         if (autoplay) {
+            // console.log(Object.keys(audioPlayer));
+            // window.PLAYER = audioPlayer
             audioPlayer.play().then(() => {
                 appState.isPlaying = true;
                 playerPlayIcon.className = 'fas fa-pause';
             }).catch(error => {
-                console.error('Error playing audio:', error);
+                console.error('Error playing audio:', error, track);
+                console.error(error.stack);
             });
         }
     }
@@ -1046,6 +1149,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadAndPlayTrackById(trackId) {
         try {
             const track = await ApiService.getTrack(trackId);
+            console.log('TRACK', track)
             loadAndPlayTrack(track);
         } catch (error) {
             console.error(`Error loading track ${trackId}:`, error);
@@ -1055,11 +1159,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Load and play a track
     function loadAndPlayTrack(track) {
+        console.log('DOES IT DO IT')
         loadTrack(track, true);
     }
 
     // Toggle play/pause
     function togglePlayPause() {
+        console.log('trying play/pause')
         if (!appState.currentTrack) return;
         
         if (appState.isPlaying) {
@@ -1072,6 +1178,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 playButton.innerHTML = '<i class="fas fa-play"></i> Play';
             }
         } else {
+            console.log('PLAY')
             audioPlayer.play().then(() => {
                 appState.isPlaying = true;
                 playerPlayIcon.className = 'fas fa-pause';

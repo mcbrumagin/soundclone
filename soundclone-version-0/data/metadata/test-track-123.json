@@ -1,0 +1,31 @@
+{
+  "id": "test-track-123",
+  "title": "Test Guitar Track",
+  "description": "A sample guitar track for testing",
+  "fileName": "test-track.wav",
+  "fileType": "audio/wav",
+  "fileSize": 1024000,
+  "duration": 120,
+  "audioUrl": "/api/audio/test-track-123",
+  "createdAt": "2025-05-20T22:13:00.000Z",
+  "updatedAt": "2025-05-20T22:13:00.000Z",
+  "shareableLink": "test-track-123",
+  "comments": [
+    {
+      "id": "comment-1",
+      "text": "Great melody at @00:15",
+      "timestamp": "2025-05-20T22:13:30.000Z",
+      "updatedAt": "2025-05-20T22:13:30.000Z",
+      "hasTimestamp": true,
+      "trackTimestamp": 15
+    },
+    {
+      "id": "comment-2",
+      "text": "Nice chord progression here @00:45",
+      "timestamp": "2025-05-20T22:14:00.000Z",
+      "updatedAt": "2025-05-20T22:14:00.000Z",
+      "hasTimestamp": true,
+      "trackTimestamp": 45
+    }
+  ]
+}

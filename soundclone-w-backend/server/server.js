@@ -6,9 +6,10 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
-// Create Express app
+const https = require('https');
 const app = express();
-const PORT = process.env.PORT || 3000;
+
+// const PORT = process.env.PORT || 3000;
 
 // Create data directories if they don't exist
 const dataDir = path.join(__dirname, 'data');
@@ -356,12 +357,34 @@ app.get('/api/audio/:id', (req, res) => {
   }
 });
 
+// debug log from mobile client
+app.post('/log-endpoint', (req, res) => {
+  const { message } = req.body;
+  if (message) {
+      console.log(`Client Log:`, ...message.split('\\n'));
+      res.sendStatus(200);
+  } else {
+      res.sendStatus(400); // Bad request
+  }
+});
+
 // Handle 404
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
 });
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+
+const options = {
+  key: fs.readFileSync('key.pem'),
+  cert: fs.readFileSync('cert.pem')
+};
+
+const server = https.createServer(options, app);
+server.listen(443, '10.0.0.183', () => {
+  console.log(`HTTPS server running`);
 });
+
+// // Start the server
+// app.listen(PORT, () => {
+//   console.log(`Server running on port ${PORT}`);
+// });
