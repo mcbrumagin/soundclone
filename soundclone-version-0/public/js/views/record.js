@@ -55,7 +55,7 @@ export class RecordView {
           titleInput.value = `Recording ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`
         }
         
-        this.rerender()
+        renderApp()
       }
       
       // Start recording
@@ -70,7 +70,7 @@ export class RecordView {
       // Simulate audio level visualization
       this.simulateAudioLevel()
       
-      this.rerender()
+      renderApp()
     } catch (error) {
       console.error('Error accessing microphone:', error)
       alert('Could not access microphone. Please ensure you have granted permission.')
@@ -88,7 +88,7 @@ export class RecordView {
       // Stop timer
       clearInterval(this.recordingTimer)
       
-      this.rerender()
+      renderApp()
     }
   }
 
@@ -151,7 +151,7 @@ export class RecordView {
       if (titleInput) titleInput.value = ''
       if (descriptionInput) descriptionInput.value = ''
       
-      this.rerender()
+      renderApp()
     }
   }
 
@@ -234,11 +234,6 @@ export class RecordView {
     if (discardButton) {
       discardButton.addEventListener('click', () => this.discard())
     }
-  }
-
-  rerender() {
-    // Trigger a re-render by dispatching a custom event
-    document.dispatchEvent(new CustomEvent('view-update'))
   }
 
   render() {

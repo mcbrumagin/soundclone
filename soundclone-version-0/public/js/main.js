@@ -6,7 +6,7 @@ import { UploadView } from './views/upload.js'
 import { RecordView } from './views/record.js'
 import { TrackDetailView } from './views/track-detail.js'
 
-const { div, header, span, input, h2 } = tags
+const { div, header, span, input, h2, button } = tags
 
 // Initialize audio player system
 let player, trackManager, playerUI;
@@ -22,6 +22,34 @@ const router = new Router()
 const render = vnode => {
   const root = document.querySelector('#app')
   root.innerHTML = vnode
+}
+
+// Simple render helper
+window.renderApp = () => {
+  const currentView = router.currentView
+  let content
+  
+  switch(currentView) {
+    case 'home': 
+      content = div({ class: 'track-list' }, homeView.render())
+      break
+    case 'upload': 
+      content = uploadView.render()
+      uploadView.setupEventListeners()
+      break
+    case 'record': 
+      content = recordView.render()
+      recordView.setupEventListeners()
+      break
+    case 'track-detail': 
+      content = trackDetailView.render()
+      trackDetailView.setupEventListeners()
+      break
+    default:
+      content = div({ class: 'loading' }, 'Loading...')
+  }
+  
+  render(App(content, currentView))
 }
 
 // Global audio system for view access
@@ -51,7 +79,7 @@ window.audioSystem = {
 const showHome = async () => {
   try {
     await homeView.loadTracks()
-    renderView('home')
+    render(App(div({ class: 'track-list' }, homeView.render()), 'home'))
   } catch (err) {
     console.error('Error loading home view:', err)
     render(div({ class: 'error-message' }, 'Failed to load tracks'))
@@ -59,15 +87,13 @@ const showHome = async () => {
 }
 
 const showUpload = () => {
-  renderView('upload')
-  // Set up event listeners after render
-  setTimeout(() => uploadView.setupEventListeners(), 0)
+  render(App(uploadView.render(), 'upload'))
+  uploadView.setupEventListeners()
 }
 
 const showRecord = () => {
-  renderView('record')
-  // Set up event listeners after render
-  setTimeout(() => recordView.setupEventListeners(), 0)
+  render(App(recordView.render(), 'record'))
+  recordView.setupEventListeners()
 }
 
 const showTrackDetail = async (params) => {
@@ -75,37 +101,13 @@ const showTrackDetail = async (params) => {
   if (trackId) {
     try {
       await trackDetailView.loadTrack(trackId)
-      renderView('track-detail')
-      // Set up event listeners after render
-      setTimeout(() => trackDetailView.setupEventListeners(), 0)
+      render(App(trackDetailView.render(), 'track-detail'))
+      trackDetailView.setupEventListeners()
     } catch (err) {
       console.error('Error loading track detail:', err)
       render(div({ class: 'error-message' }, 'Failed to load track details'))
     }
   }
-}
-
-const renderView = (viewName) => {
-  let viewContent
-  
-  switch (viewName) {
-    case 'upload':
-      viewContent = uploadView.render()
-      break
-    case 'record':
-      viewContent = recordView.render()
-      break
-    case 'track-detail':
-      viewContent = trackDetailView.render()
-      break
-    case 'home':
-    default:
-      viewContent = div({ class: 'track-list' }, homeView.render())
-      break
-  }
-  
-  const app = App(viewContent, viewName)
-  render(app)
 }
 
 // Main App Component
@@ -207,11 +209,6 @@ const bootstrap = async () => {
   router.register('upload', showUpload)
   router.register('record', showRecord)
   router.register('track-detail', showTrackDetail)
-  
-  // Handle view updates
-  document.addEventListener('view-update', () => {
-    renderView(router.currentView)
-  })
   
   // Start with loading message
   render(div({ class: 'loading' }, 'Loading...'))

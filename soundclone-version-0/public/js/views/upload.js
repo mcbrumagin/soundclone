@@ -39,7 +39,7 @@ export class UploadView {
     }
     
     // Re-render to show file info
-    this.rerender()
+    renderApp()
   }
 
   async handleUpload() {
@@ -69,7 +69,7 @@ export class UploadView {
     }
     
     this.uploading = true
-    this.rerender()
+    renderApp()
     
     try {
       const track = await uploadTrack(formData)
@@ -87,7 +87,7 @@ export class UploadView {
       alert('Failed to upload track. Please try again.')
     } finally {
       this.uploading = false
-      this.rerender()
+      renderApp()
     }
   }
 
@@ -117,12 +117,12 @@ export class UploadView {
       dropArea.addEventListener('dragover', (e) => {
         e.preventDefault()
         this.dragover = true
-        this.rerender()
+        renderApp()
       })
       
       dropArea.addEventListener('dragleave', () => {
         this.dragover = false
-        this.rerender()
+        renderApp()
       })
       
       dropArea.addEventListener('drop', (e) => {
@@ -146,11 +146,6 @@ export class UploadView {
     if (uploadButton) {
       uploadButton.addEventListener('click', () => this.handleUpload())
     }
-  }
-
-  rerender() {
-    // Trigger a re-render by dispatching a custom event
-    document.dispatchEvent(new CustomEvent('view-update'))
   }
 
   render() {

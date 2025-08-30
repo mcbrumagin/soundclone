@@ -107,7 +107,7 @@ export class TrackDetailView {
         
           // Update local state
           this.currentTrack = updatedTrack
-          this.rerender()
+          renderApp()
         } catch (error) {
           console.error('Error updating track:', error)
           alert('Failed to update track. Please try again.')
@@ -143,7 +143,7 @@ export class TrackDetailView {
         this.comments.push(newComment)
         commentInput.value = ''
         
-        this.rerender()
+        renderApp()
       } catch (error) {
         console.error('Error adding comment:', error)
         alert('Failed to add comment. Please try again.')
@@ -217,7 +217,7 @@ export class TrackDetailView {
             if (newText !== null && newText.trim() !== '') {
               comment.text = newText
               comment.hasTimestamp = /@\d{2}:\d{2}/.test(newText)
-              this.rerender()
+              renderApp()
             }
           }
         }
@@ -226,15 +226,11 @@ export class TrackDetailView {
           const commentId = deleteBtn.getAttribute('data-comment-id')
           if (confirm('Are you sure you want to delete this comment?')) {
             this.comments = this.comments.filter(c => c.id !== commentId)
-            this.rerender()
+            renderApp()
           }
         }
       })
     }
-  }
-
-  rerender() {
-    document.dispatchEvent(new CustomEvent('view-update'))
   }
 
   render() {

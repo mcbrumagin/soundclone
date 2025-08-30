@@ -11,7 +11,7 @@ const formatTime = (seconds) => {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
 }
 
-const TrackCard = (track, onPlay) =>
+const TrackCard = (track, playTrack) =>
   div({ class: 'track-card' },
     div({ class: 'track-card-header' },
       h2({ class: 'track-title' }, track.title),
@@ -20,7 +20,7 @@ const TrackCard = (track, onPlay) =>
       )
     ),
     div({ class: 'track-actions' },
-      button({ class: 'play-track', onclick: () => onPlay(track.id) }, 
+      button({ class: 'play-track', onClick: () => playTrack(track.id) }, 
         i({ class: 'fas fa-play' }), ' Play'
       ),
       a({ 
@@ -56,7 +56,7 @@ export class HomeView {
     }
   }
 
-  async onPlay(id) {
+  async playTrack(id) {
     console.log('Play button clicked for track:', id)
     
     if (!this.audioSystem.trackManager) {
@@ -96,7 +96,7 @@ export class HomeView {
     }
 
     return div({ class: 'track-list' }, 
-      ...this.tracks.map(track => TrackCard(track, (id) => this.onPlay(id)))
+      ...this.tracks.map(track => TrackCard(track, (id) => this.playTrack(id)))
     )
   }
 }
