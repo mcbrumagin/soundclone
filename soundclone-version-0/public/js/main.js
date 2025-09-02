@@ -1,4 +1,4 @@
-import { tags } from 'micro-js-html'
+import { tags, renderHelper } from 'micro-js-html'
 import { Router } from './router.js'
 import { Navigation } from './components/navigation.js'
 import { HomeView } from './views/home.js'
@@ -19,13 +19,16 @@ const trackDetailView = new TrackDetailView()
 
 const router = new Router()
 
-const render = vnode => {
-  const root = document.querySelector('#app')
-  root.innerHTML = vnode
-}
+// const render = vnode => {
+//   const root = document.querySelector('#app')
+//   root.innerHTML = vnode
+// }
+
+const render = renderHelper('#app')
 
 // Simple render helper
 window.renderApp = () => {
+  console.log('Rendering app')
   const currentView = router.currentView
   let content
   
@@ -77,6 +80,7 @@ window.audioSystem = {
 
 // Route handlers
 const showHome = async () => {
+  console.log('Showing home')
   try {
     await homeView.loadTracks()
     render(App(div({ class: 'track-list' }, homeView.render()), 'home'))

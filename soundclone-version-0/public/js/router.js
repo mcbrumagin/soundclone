@@ -41,6 +41,7 @@ export class Router {
     
     // Delegate click events for navigation
     document.addEventListener('click', (e) => {
+      console.log('Click event for nav')
       const navLink = e.target.closest('[data-view]')
       if (navLink) {
         e.preventDefault()
