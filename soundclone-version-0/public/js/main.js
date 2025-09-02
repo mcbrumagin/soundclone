@@ -1,5 +1,5 @@
 import { tags, renderHelper } from 'micro-js-html'
-import { Router } from './router.js'
+// Removed router import - using simple hashchange handler
 import { Navigation } from './components/navigation.js'
 import { HomeView } from './views/home.js'
 import { UploadView } from './views/upload.js'
@@ -17,7 +17,11 @@ const uploadView = new UploadView()
 const recordView = new RecordView()
 const trackDetailView = new TrackDetailView()
 
-const router = new Router()
+// Simple router state
+const router = {
+  currentView: 'home',
+  currentTrackId: null
+}
 
 // const render = vnode => {
 //   const root = document.querySelector('#app')
@@ -27,29 +31,42 @@ const router = new Router()
 const render = renderHelper('#app')
 
 // Simple render helper
-window.renderApp = () => {
-  console.log('Rendering app')
+window.renderApp = async () => {
+  console.log('Rendering app for view:', router.currentView)
   const currentView = router.currentView
   let content
   
-  switch(currentView) {
-    case 'home': 
-      content = div({ class: 'track-list' }, homeView.render())
-      break
-    case 'upload': 
-      content = uploadView.render()
-      uploadView.setupEventListeners()
-      break
-    case 'record': 
-      content = recordView.render()
-      recordView.setupEventListeners()
-      break
-    case 'track-detail': 
-      content = trackDetailView.render()
-      trackDetailView.setupEventListeners()
-      break
-    default:
-      content = div({ class: 'loading' }, 'Loading...')
+  try {
+    switch(currentView) {
+      case 'home': 
+        // Load tracks if needed
+        if (homeView.tracks.length === 0) {
+          await homeView.loadTracks()
+        }
+        content = div({ class: 'track-list' }, homeView.render())
+        break
+      case 'upload': 
+        content = uploadView.render()
+        // setTimeout(() => uploadView.setupEventListeners(), 0)
+        break
+      case 'record': 
+        content = recordView.render()
+        setTimeout(() => recordView.setupEventListeners(), 0)
+        break
+      case 'track-detail': 
+        // Load track details if needed
+        if (router.currentTrackId && (!trackDetailView.currentTrack || trackDetailView.currentTrack.id !== router.currentTrackId)) {
+          await trackDetailView.loadTrack(router.currentTrackId)
+        }
+        content = trackDetailView.render()
+        setTimeout(() => trackDetailView.setupEventListeners(), 0)
+        break
+      default:
+        content = div({ class: 'loading' }, 'Loading...')
+    }
+  } catch (err) {
+    console.error('Error rendering view:', err)
+    content = div({ class: 'error-message' }, `Failed to load ${currentView} view`)
   }
   
   render(App(content, currentView))
@@ -78,41 +95,21 @@ window.audioSystem = {
   }
 }
 
-// Route handlers
-const showHome = async () => {
-  console.log('Showing home')
-  try {
-    await homeView.loadTracks()
-    render(App(div({ class: 'track-list' }, homeView.render()), 'home'))
-  } catch (err) {
-    console.error('Error loading home view:', err)
-    render(div({ class: 'error-message' }, 'Failed to load tracks'))
-  }
+// Simple hash-based routing
+const handleRouteChange = () => {
+  const hash = window.location.hash.substring(1) || 'home'
+  const [view, ...params] = hash.split('/')
+  
+  router.currentView = view
+  router.currentTrackId = params[0] || null
+  
+  console.log('Route changed to:', view, params)
+  renderApp()
 }
 
-const showUpload = () => {
-  render(App(uploadView.render(), 'upload'))
-  uploadView.setupEventListeners()
-}
-
-const showRecord = () => {
-  render(App(recordView.render(), 'record'))
-  recordView.setupEventListeners()
-}
-
-const showTrackDetail = async (params) => {
-  const trackId = params[0]
-  if (trackId) {
-    try {
-      await trackDetailView.loadTrack(trackId)
-      render(App(trackDetailView.render(), 'track-detail'))
-      trackDetailView.setupEventListeners()
-    } catch (err) {
-      console.error('Error loading track detail:', err)
-      render(div({ class: 'error-message' }, 'Failed to load track details'))
-    }
-  }
-}
+// Set up routing
+window.addEventListener('hashchange', handleRouteChange)
+window.addEventListener('popstate', handleRouteChange)
 
 // Main App Component
 const App = (viewContent, currentView) =>
@@ -208,17 +205,11 @@ const bootstrap = async () => {
     }
   }, 100);
 
-  // Register routes
-  router.register('home', showHome)
-  router.register('upload', showUpload)
-  router.register('record', showRecord)
-  router.register('track-detail', showTrackDetail)
-  
   // Start with loading message
   render(div({ class: 'loading' }, 'Loading...'))
   
   // Handle initial route
-  router.handleRoute()
+  handleRouteChange()
 }
 
 bootstrap() 

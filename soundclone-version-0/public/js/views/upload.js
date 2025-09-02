@@ -106,48 +106,6 @@ export class UploadView {
     if (descriptionInput) descriptionInput.value = ''
   }
 
-  setupEventListeners() {
-    const dropArea = document.getElementById('dropArea')
-    const fileInput = document.getElementById('fileInput')
-    const uploadButton = document.getElementById('uploadButton')
-    
-    if (dropArea) {
-      dropArea.addEventListener('click', () => fileInput?.click())
-      
-      dropArea.addEventListener('dragover', (e) => {
-        e.preventDefault()
-        this.dragover = true
-        renderApp()
-      })
-      
-      dropArea.addEventListener('dragleave', () => {
-        this.dragover = false
-        renderApp()
-      })
-      
-      dropArea.addEventListener('drop', (e) => {
-        e.preventDefault()
-        this.dragover = false
-        
-        if (e.dataTransfer.files.length) {
-          this.handleFileSelect(e.dataTransfer.files[0])
-        }
-      })
-    }
-    
-    if (fileInput) {
-      fileInput.addEventListener('change', () => {
-        if (fileInput.files.length) {
-          this.handleFileSelect(fileInput.files[0])
-        }
-      })
-    }
-    
-    if (uploadButton) {
-      uploadButton.addEventListener('click', () => this.handleUpload())
-    }
-  }
-
   render() {
     return main({ class: 'container' },
       a({ class: 'back-button', 'data-view': 'home', href: '#home' },
@@ -157,7 +115,24 @@ export class UploadView {
       div({ class: 'upload-container' },
         div({ 
           class: `file-drop-area ${this.dragover ? 'dragover' : ''}`, 
-          id: 'dropArea' 
+          id: 'dropArea',
+          onclick: () => fileInput?.click(),
+          ondragover: (e) => {
+            e.preventDefault()
+            this.dragover = true
+            renderApp()
+          },
+          ondragleave: () => {
+            this.dragover = false
+            renderApp()
+          },
+          ondrop: (e) => {
+            e.preventDefault()
+            this.dragover = false
+            if (e.dataTransfer.files.length) {
+              this.handleFileSelect(e.dataTransfer.files[0])
+            }
+          }
         },
           i({ class: 'fas fa-cloud-upload-alt fa-3x' }),
           p({}, 'Drag & Drop or Click to Select File'),
@@ -165,7 +140,12 @@ export class UploadView {
             type: 'file', 
             id: 'fileInput', 
             class: 'file-input', 
-            accept: 'audio/mp3,audio/wav,audio/webm' 
+            accept: 'audio/mp3,audio/wav,audio/webm',
+            onchange: () => {
+              if (fileInput.files.length) {
+                this.handleFileSelect(fileInput.files[0])
+              }
+            }
           })
         ),
         div({ 
@@ -201,9 +181,11 @@ export class UploadView {
         ),
         button({ 
           id: 'uploadButton',
-          disabled: !this.selectedFile || this.uploading
+          disabled: !this.selectedFile || this.uploading,
+          onclick: () => this.handleUpload()
         }, this.uploading ? 'Uploading...' : 'Upload')
       )
     )
   }
 }
+
