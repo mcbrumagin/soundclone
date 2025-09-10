@@ -32,7 +32,7 @@ const render = renderHelper('#app')
 
 // Simple render helper
 window.renderApp = async () => {
-  console.log('Rendering app for view:', router.currentView)
+  console.log('Rendering app for view:', router.currentView, new Error('stack').stack)
   const currentView = router.currentView
   let content
   
@@ -51,7 +51,6 @@ window.renderApp = async () => {
         break
       case 'record': 
         content = recordView.render()
-        setTimeout(() => recordView.setupEventListeners(), 0)
         break
       case 'track-detail': 
         // Load track details if needed

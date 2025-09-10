@@ -204,37 +204,7 @@ export class RecordView {
     }
   }
 
-  setupEventListeners() {
-    const recordButton = document.getElementById('recordButton')
-    const playButton = document.getElementById('playButton')
-    const resetButton = document.getElementById('resetButton')
-    const saveButton = document.getElementById('saveButton')
-    const discardButton = document.getElementById('discardButton')
-    
-    if (recordButton) {
-      recordButton.addEventListener('click', () => this.toggleRecording())
-    }
-    
-    if (playButton) {
-      playButton.addEventListener('click', () => {
-        if (this.recordingUrl && window.audioSystem) {
-          window.audioSystem.togglePlayPause()
-        }
-      })
-    }
-    
-    if (resetButton) {
-      resetButton.addEventListener('click', () => this.reset())
-    }
-    
-    if (saveButton) {
-      saveButton.addEventListener('click', () => this.saveRecording())
-    }
-    
-    if (discardButton) {
-      discardButton.addEventListener('click', () => this.discard())
-    }
-  }
+
 
   render() {
     return main({ class: 'container' },
@@ -246,7 +216,8 @@ export class RecordView {
         div({ class: 'record-interface' },
           button({ 
             class: `record-button ${this.isRecording ? 'recording' : ''}`, 
-            id: 'recordButton' 
+            id: 'recordButton',
+            onclick: () => this.toggleRecording()
           },
             i({ class: this.isRecording ? 'fas fa-stop' : 'fas fa-microphone' })
           ),
@@ -259,17 +230,24 @@ export class RecordView {
             })
           ),
           div({ class: 'record-controls' },
-            button({ 
+            button({
               id: 'playButton', 
-              disabled: !this.recordingUrl 
+              disabled: !this.recordingUrl,
+              onclick: () => {
+                if (this.recordingUrl && window.audioSystem) {
+                  window.audioSystem.togglePlayPause()
+                }
+              }
             },
               i({ class: 'fas fa-play' }), ' Play'
             ),
             button({ 
               id: 'resetButton', 
-              disabled: !this.recordingUrl 
+              disabled: !this.recordingUrl,
+              onclick: () => this.reset()
             },
-              i({ class: 'fas fa-undo' }), ' Reset'
+              i({ class: 'fas fa-undo' }),
+              ' Reset'
             )
           )
         ),
@@ -291,14 +269,16 @@ export class RecordView {
           })
         ),
         div({ class: 'action-buttons' },
-          button({ 
+          button({
             id: 'saveButton', 
-            disabled: !this.recordingUrl 
+            disabled: !this.recordingUrl,
+            onclick: () => this.saveRecording()
           }, 'Save Recording'),
-          button({ 
+          button({
             class: 'secondary', 
             id: 'discardButton', 
-            disabled: !this.recordingUrl 
+            disabled: !this.recordingUrl,
+            onclick: () => this.discard()
           }, 'Discard')
         )
       )
