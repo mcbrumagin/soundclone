@@ -11,7 +11,7 @@ import AudioPlayer from './audio-player.js'
 const { div, header } = tags
 
 // Initialize audio player system
-let player, trackManager;
+let player, trackManager
 
 // View instances
 const homeView = new HomeView()
@@ -131,10 +131,10 @@ const App = (viewContent, currentView) =>
 
 const bootstrap = async () => {
   // Initialize audio player system
-  player = new AudioPlayer();
-  window.player = player; // TODO
+  player = new AudioPlayer()
+  window.player = player // TODO
 
-  trackManager = new TrackManager(player);
+  trackManager = new TrackManager(player)
   
   // Update global audio system
   window.audioSystem.player = player
@@ -198,21 +198,6 @@ const bootstrap = async () => {
   
   // Pass audio system to home view
   homeView.audioSystem = window.audioSystem
-  
-  // Initialize UI after render
-  setTimeout(() => {
-    const playerElements = {
-      playButton: document.getElementById('playerPlayButton'),
-      progressSlider: document.getElementById('playerProgressSlider'),
-      timeDisplay: document.getElementById('playerTimeDisplay'),
-      volumeSlider: document.getElementById('volumeSlider')
-    };
-    
-    // if (Object.values(playerElements).some(el => el)) {
-    //   playerComponent = new PlayerComponent(player, playerElements);
-    //   window.audioSystem.playerComponent = playerComponent // TODO gross
-    // }
-  }, 100);
 
   // Start with loading message
   render(div({ class: 'loading' }, 'Loading...'))
