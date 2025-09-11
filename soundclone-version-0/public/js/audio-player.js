@@ -1,4 +1,5 @@
-// Audio Player System - Clean, modular design
+import { tags } from 'micro-js-html'
+const { div, input, button, span } = tags
 
 class AudioPlayer {
   constructor() {
@@ -88,147 +89,91 @@ class AudioPlayer {
     if (!this.listeners[event]) this.listeners[event] = [];
     this.listeners[event].push(callback);
   }
-}
 
-class PlayerUI {
-  constructor(player, elements) {
-    this.player = player;
-    this.elements = elements; // { playButton, progressSlider, timeDisplay, etc. }
-    
-    this.setupUI();
-    this.bindPlayerEvents();
-  }
-
-  setupUI() {
-    // Play button
-    if (this.elements.playButton) {
-      this.elements.playButton.addEventListener('click', () => {
-        this.player.toggle();
-      });
-    }
-
-    // Progress slider
-    if (this.elements.progressSlider) {
-      this.elements.progressSlider.addEventListener('input', (e) => {
-        const seekTime = (e.target.value / 100) * this.player.audio.duration;
-        this.player.seek(seekTime);
-      });
-    }
-
-    // Volume slider
-    if (this.elements.volumeSlider) {
-      this.elements.volumeSlider.addEventListener('input', (e) => {
-        this.player.setVolume(e.target.value);
-      });
-    }
-  }
-
-  bindPlayerEvents() {
-    this.player.on('timeupdate', (data) => {
-      this.updateProgress(data);
-    });
-
-    this.player.on('loaded', (data) => {
-      this.updateDuration(data.duration);
-    });
-
-    this.player.on('play', () => {
-      this.updatePlayButton(true);
-    });
-
-    this.player.on('pause', () => {
-      this.updatePlayButton(false);
-    });
-
-    this.player.on('ended', () => {
-      this.updatePlayButton(false);
-    });
-
-    this.player.on('error', (error) => {
-      console.error('Player UI error:', error);
-      this.updatePlayButton(false);
-    });
-  }
-
-  updateProgress({ currentTime, duration }) {
-    // Update progress slider
-    if (this.elements.progressSlider && duration) {
-      const progress = (currentTime / duration) * 100;
-      this.elements.progressSlider.value = progress || 0;
+  updatePlayer() {
+    if (window.audioSystem && window.audioSystem.playerUI) {
+      const playerElements = {
+        playButton: document.getElementById('playerPlayButton'),
+        progressSlider: document.getElementById('playerProgressSlider'),
+        timeDisplay: document.getElementById('playerTimeDisplay'),
+        volumeSlider: document.getElementById('volumeSlider')
+      };
+      
+      // Update the PlayerUI elements reference
+      if (Object.values(playerElements).some(el => el)) {
+        window.audioSystem.playerUI.elements = playerElements
+      }
     }
     
-    // Update time display
-    if (this.elements.timeDisplay) {
-      const current = this.formatTime(currentTime || 0);
-      const total = this.formatTime(duration || 0);
-      this.elements.timeDisplay.textContent = `${current} / ${total}`;
-    }
-  }
-
-  updatePlayButton(isPlaying) {
-    if (this.elements.playButton) {
-      const icon = this.elements.playButton.querySelector('span');
+    // Update play button state without full re-render
+    const playButton = document.getElementById('playerPlayButton')
+    if (playButton) {
+      const icon = playButton.querySelector('span')
       if (icon) {
-        icon.textContent = isPlaying ? '⏸' : '▶';
+        icon.textContent = appState.isPlaying ? '⏸' : '▶'
       }
     }
   }
 
-  updateDuration(duration) {
-    if (this.elements.progressSlider) {
-      this.elements.progressSlider.max = 100;
-    }
-    
-    // Update time display to show total duration
-    if (this.elements.timeDisplay && duration) {
-      this.elements.timeDisplay.textContent = `0:00 / ${this.formatTime(duration)}`;
-    }
-  }
+  render() {
+    setTimeout(this.updatePlayer, 0) // TODO this is ugly
 
-  formatTime(seconds) {
-    if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return div({ class: 'audio-player' },
+      div({ class: 'player-controls' },
+        button({ 
+          id: 'playerPlayButton', 
+          class: 'play-button',
+          onclick: () => {
+            if (window.audioSystem && window.audioSystem.togglePlayPause) {
+              window.audioSystem.togglePlayPause()
+            }
+          }
+        }, 
+          span({}, appState.isPlaying ? '⏸' : '▶')
+        ),
+        div({ class: 'progress-container' },
+          input({ 
+            type: 'range', 
+            id: 'playerProgressSlider', 
+            class: 'progress-slider', 
+            min: '0', 
+            max: '100', 
+            value: '0',
+            oninput: (e) => {
+              if (window.audioSystem && window.audioSystem.player && window.audioSystem.player.audio) {
+                const duration = window.audioSystem.player.audio.duration
+                console.log('Duration:', duration)
+                if (duration && !isNaN(duration) && isFinite(duration)) {
+                  const seekTime = (parseFloat(e.target.value) / 100) * duration
+                  if (!isNaN(seekTime) && isFinite(seekTime)) {
+                    window.audioSystem.seekTo(seekTime)
+                  }
+                }
+              }
+            }
+          }),
+          span({ id: 'playerTimeDisplay', class: 'time-display' }, '0:00 / 0:00')
+        ),
+        div({ class: 'volume-container' },
+          span({}, '🔊'),
+          input({ 
+            type: 'range', 
+            id: 'volumeSlider', 
+            class: 'volume-slider', 
+            min: '0', 
+            max: '1', 
+            step: '0.1', 
+            value: '1',
+            oninput: (e) => {
+              if (window.audioSystem && window.audioSystem.player) {
+                window.audioSystem.player.setVolume(parseFloat(e.target.value))
+              }
+            }
+          })
+        )
+      )
+    )
   }
 }
 
-class TrackManager {
-  constructor(player) {
-    this.player = player;
-    this.tracks = [];
-  }
-
-  async loadTracks() {
-    try {
-      const response = await fetch('/api/tracks');
-      const data = await response.json();
-      this.tracks = data.tracks || [];
-      console.log('Tracks loaded:', this.tracks);
-      return this.tracks;
-    } catch (error) {
-      console.error('Failed to load tracks:', error);
-      return [];
-    }
-  }
-
-  playTrack(trackId) {
-    const track = this.tracks.find(t => t.id === trackId);
-    if (track) {
-      console.log('Playing track:', track);
-      this.player.loadTrack(track);
-      return this.player.play();
-    }
-    console.error('Track not found:', trackId);
-    return false;
-  }
-
-  getTrack(trackId) {
-    return this.tracks.find(t => t.id === trackId);
-  }
-}
-
-// Export for use in other modules
-window.AudioPlayer = AudioPlayer;
-window.PlayerUI = PlayerUI;
-window.TrackManager = TrackManager;
+export default AudioPlayer;

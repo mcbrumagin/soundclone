@@ -5,11 +5,14 @@ import { HomeView } from './views/home.js'
 import { UploadView } from './views/upload.js'
 import { RecordView } from './views/record.js'
 import { TrackDetailView } from './views/track-detail.js'
+import TrackManager from './track-manager.js'
+import AudioPlayer from './audio-player.js'
+import PlayerComponent from './player-component.js'
 
 const { div, header, span, input, h2, button } = tags
 
 // Initialize audio player system
-let player, trackManager, playerUI;
+let player, trackManager, playerComponent;
 
 // View instances
 const homeView = new HomeView()
@@ -30,39 +33,9 @@ const appState = {
 }
 window.appState = appState
 
-// const render = vnode => {
-//   const root = document.querySelector('#app')
-//   root.innerHTML = vnode
-// }
-
 const render = renderHelper('#app')
 const renderPlayer = renderHelper('#audio-player')
 
-// Separate player UI update function (no full re-render)
-const updatePlayerUI = () => {
-  if (window.audioSystem && window.audioSystem.playerUI) {
-    const playerElements = {
-      playButton: document.getElementById('playerPlayButton'),
-      progressSlider: document.getElementById('playerProgressSlider'),
-      timeDisplay: document.getElementById('playerTimeDisplay'),
-      volumeSlider: document.getElementById('volumeSlider')
-    };
-    
-    // Update the PlayerUI elements reference
-    if (Object.values(playerElements).some(el => el)) {
-      window.audioSystem.playerUI.elements = playerElements
-    }
-  }
-  
-  // Update play button state without full re-render
-  const playButton = document.getElementById('playerPlayButton')
-  if (playButton) {
-    const icon = playButton.querySelector('span')
-    if (icon) {
-      icon.textContent = appState.isPlaying ? '⏸' : '▶'
-    }
-  }
-}
 
 // Simple render helper
 window.renderApp = async () => {
@@ -107,19 +80,14 @@ window.renderApp = async () => {
 
 // Separate audio player rendering function
 window.renderAudioPlayer = () => {
-  renderPlayer(AudioPlayerUI())
-  
-  // Reinitialize PlayerUI after render to ensure it can find the DOM elements
-  setTimeout(() => {
-    updatePlayerUI()
-  }, 0)
+  renderPlayer(window.player.render())
 }
 
 // Global audio system for view access
 window.audioSystem = {
   player: null,
   trackManager: null,
-  playerUI: null,
+  playerComponent: null,
   loadTrack: (track, autoplay = false) => {
     console.log('Loading track:', track)
     // Implementation will be added when audio system is ready
@@ -165,66 +133,13 @@ const App = (viewContent, currentView) =>
   )
 
 // Audio Player UI Component
-const AudioPlayerUI = () =>
-  div({ class: 'audio-player' },
-    div({ class: 'player-controls' },
-      button({ 
-        id: 'playerPlayButton', 
-        class: 'play-button',
-        onclick: () => {
-          if (window.audioSystem && window.audioSystem.togglePlayPause) {
-            window.audioSystem.togglePlayPause()
-          }
-        }
-      }, 
-        span({}, appState.isPlaying ? '⏸' : '▶')
-      ),
-      div({ class: 'progress-container' },
-        input({ 
-          type: 'range', 
-          id: 'playerProgressSlider', 
-          class: 'progress-slider', 
-          min: '0', 
-          max: '100', 
-          value: '0',
-          oninput: (e) => {
-            if (window.audioSystem && window.audioSystem.player && window.audioSystem.player.audio) {
-              const duration = window.audioSystem.player.audio.duration
-              console.log('Duration:', duration)
-              if (duration && !isNaN(duration) && isFinite(duration)) {
-                const seekTime = (parseFloat(e.target.value) / 100) * duration
-                if (!isNaN(seekTime) && isFinite(seekTime)) {
-                  window.audioSystem.seekTo(seekTime)
-                }
-              }
-            }
-          }
-        }),
-        span({ id: 'playerTimeDisplay', class: 'time-display' }, '0:00 / 0:00')
-      ),
-      div({ class: 'volume-container' },
-        span({}, '🔊'),
-        input({ 
-          type: 'range', 
-          id: 'volumeSlider', 
-          class: 'volume-slider', 
-          min: '0', 
-          max: '1', 
-          step: '0.1', 
-          value: '1',
-          oninput: (e) => {
-            if (window.audioSystem && window.audioSystem.player) {
-              window.audioSystem.player.setVolume(parseFloat(e.target.value))
-            }
-          }
-        })
-      )
-    )
-  )
+// TODO? AudioPlayerUI
 
 const bootstrap = async () => {
   // Initialize audio player system
   player = new AudioPlayer();
+  window.player = player; // TODO
+
   trackManager = new TrackManager(player);
   
   // Update global audio system
@@ -298,8 +213,8 @@ const bootstrap = async () => {
     };
     
     if (Object.values(playerElements).some(el => el)) {
-      playerUI = new PlayerUI(player, playerElements);
-      window.audioSystem.playerUI = playerUI
+      playerComponent = new PlayerComponent(player, playerElements);
+      window.audioSystem.playerComponent = playerComponent // TODO gross
     }
   }, 100);
 
