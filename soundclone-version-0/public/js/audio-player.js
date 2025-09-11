@@ -25,6 +25,7 @@ class AudioPlayer {
     try {
       await this.audio.play();
       this.isPlaying = true;
+      this.emit('play');
       return true;
     } catch (error) {
       console.error('Playback failed:', error);
@@ -35,6 +36,7 @@ class AudioPlayer {
   pause() {
     this.audio.pause();
     this.isPlaying = false;
+    this.emit('pause');
   }
 
   toggle() {
@@ -130,6 +132,14 @@ class PlayerUI {
       this.updateDuration(data.duration);
     });
 
+    this.player.on('play', () => {
+      this.updatePlayButton(true);
+    });
+
+    this.player.on('pause', () => {
+      this.updatePlayButton(false);
+    });
+
     this.player.on('ended', () => {
       this.updatePlayButton(false);
     });
@@ -141,14 +151,17 @@ class PlayerUI {
   }
 
   updateProgress({ currentTime, duration }) {
-    if (this.elements.progressSlider) {
+    // Update progress slider
+    if (this.elements.progressSlider && duration) {
       const progress = (currentTime / duration) * 100;
-      this.elements.progressSlider.value = progress;
+      this.elements.progressSlider.value = progress || 0;
     }
     
+    // Update time display
     if (this.elements.timeDisplay) {
-      this.elements.timeDisplay.textContent = 
-        `${this.formatTime(currentTime)} / ${this.formatTime(duration)}`;
+      const current = this.formatTime(currentTime || 0);
+      const total = this.formatTime(duration || 0);
+      this.elements.timeDisplay.textContent = `${current} / ${total}`;
     }
   }
 
@@ -165,10 +178,15 @@ class PlayerUI {
     if (this.elements.progressSlider) {
       this.elements.progressSlider.max = 100;
     }
+    
+    // Update time display to show total duration
+    if (this.elements.timeDisplay && duration) {
+      this.elements.timeDisplay.textContent = `0:00 / ${this.formatTime(duration)}`;
+    }
   }
 
   formatTime(seconds) {
-    if (!seconds || isNaN(seconds)) return '0:00';
+    if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '0:00';
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -186,6 +204,7 @@ class TrackManager {
       const response = await fetch('/api/tracks');
       const data = await response.json();
       this.tracks = data.tracks || [];
+      console.log('Tracks loaded:', this.tracks);
       return this.tracks;
     } catch (error) {
       console.error('Failed to load tracks:', error);

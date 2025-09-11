@@ -11,8 +11,10 @@ const formatTime = (seconds) => {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
 }
 
-const TrackCard = (track, playTrack) =>
-  div({ class: 'track-card' },
+const TrackCard = (track, playTrack, isCurrentlyPlaying, isPlaying) => {
+  const isThisTrackPlaying = isCurrentlyPlaying && isPlaying
+  
+  return div({ class: 'track-card' },
     div({ class: 'track-card-header' },
       h2({ class: 'track-title' }, track.title),
       div({ class: 'track-date' }, 
@@ -20,8 +22,12 @@ const TrackCard = (track, playTrack) =>
       )
     ),
     div({ class: 'track-actions' },
-      button({ class: 'play-track', onClick: () => playTrack(track.id) }, 
-        i({ class: 'fas fa-play' }), ' Play'
+      button({ 
+        class: `play-track ${isThisTrackPlaying ? 'playing' : ''}`, 
+        onClick: () => playTrack(track.id) 
+      }, 
+        i({ class: isThisTrackPlaying ? 'fas fa-pause' : 'fas fa-play' }), 
+        isThisTrackPlaying ? ' Pause' : ' Play'
       ),
       a({ 
         class: 'secondary view-track', 
@@ -31,6 +37,7 @@ const TrackCard = (track, playTrack) =>
       }, 'View Details')
     )
   )
+}
 
 export class HomeView {
   constructor(audioSystem) {
@@ -65,6 +72,13 @@ export class HomeView {
     }
 
     try {
+      // Check if this track is already playing
+      if (window.appState && window.appState.currentlyPlayingTrackId === id && window.appState.isPlaying) {
+        // If it's playing, pause it
+        this.audioSystem.player.pause()
+        return
+      }
+
       // Get the track data
       const track = this.audioSystem.trackManager.getTrack(id)
       if (!track) {
@@ -75,8 +89,8 @@ export class HomeView {
 
       console.log('Loading track:', track)
       
-      // Load the track into the player
-      this.audioSystem.player.loadTrack(track)
+      // Load the track into the player (this updates currentlyPlayingTrackId)
+      this.audioSystem.loadTrack(track, false)
       
       // Attempt to play
       const success = await this.audioSystem.player.play()
@@ -96,7 +110,12 @@ export class HomeView {
     }
 
     return div({ class: 'track-list' }, 
-      ...this.tracks.map(track => TrackCard(track, (id) => this.playTrack(id)))
+      ...this.tracks.map(track => TrackCard(
+        track, 
+        (id) => this.playTrack(id),
+        window.appState && window.appState.currentlyPlayingTrackId === track.id,
+        window.appState && window.appState.isPlaying
+      ))
     )
   }
 }

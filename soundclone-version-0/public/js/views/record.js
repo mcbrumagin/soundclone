@@ -239,7 +239,8 @@ export class RecordView {
                 }
               }
             },
-              i({ class: 'fas fa-play' }), ' Play'
+              i({ class: window.appState && window.appState.isPlaying ? 'fas fa-pause' : 'fas fa-play' }), 
+              window.appState && window.appState.isPlaying ? ' Pause' : ' Play'
             ),
             button({ 
               id: 'resetButton', 

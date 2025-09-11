@@ -1,0 +1,14 @@
+{
+  "id": "603400ba-98d2-447b-8c39-9178996f78bf",
+  "title": "test-track",
+  "description": "",
+  "fileName": "603400ba-98d2-447b-8c39-9178996f78bf.wav",
+  "fileType": "audio/wav",
+  "fileSize": 9098142,
+  "duration": 63.159688,
+  "audioUrl": "/api/audio/603400ba-98d2-447b-8c39-9178996f78bf",
+  "createdAt": "2025-09-10T19:59:44.220Z",
+  "updatedAt": "2025-09-10T19:59:44.220Z",
+  "shareableLink": "603400ba-98d2-447b-8c39-9178996f78bf",
+  "comments": []
+}

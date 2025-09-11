@@ -28,14 +28,18 @@ export class UploadView {
     }
     
     // Preview the audio if audio system is available
-    if (window.audioSystem) {
+    if (window.audioSystem && window.audioSystem.player) {
       const fileURL = URL.createObjectURL(file)
       console.log('Created fileUrl:', fileURL)
-      // Load track for preview but don't autoplay
-      window.audioSystem.loadTrack({
+      // For file preview, directly set the audio source instead of using loadTrack
+      // since loadTrack expects a track with an id for API URL construction
+      window.audioSystem.player.audio.src = fileURL
+      window.audioSystem.player.audio.load()
+      window.audioSystem.player.currentTrack = {
         title: titleFromFile,
-        audioUrl: fileURL
-      }, false)
+        audioUrl: fileURL,
+        isPreview: true
+      }
     }
     
     // Re-render to show file info
@@ -92,6 +96,13 @@ export class UploadView {
   }
 
   reset() {
+    // Clean up preview object URL to prevent memory leaks
+    if (window.audioSystem && window.audioSystem.player && window.audioSystem.player.currentTrack?.isPreview) {
+      URL.revokeObjectURL(window.audioSystem.player.currentTrack.audioUrl)
+      window.audioSystem.player.audio.src = ''
+      window.audioSystem.player.currentTrack = null
+    }
+    
     this.selectedFile = null
     this.title = ''
     this.description = ''
@@ -116,7 +127,7 @@ export class UploadView {
         div({ 
           class: `file-drop-area ${this.dragover ? 'dragover' : ''}`, 
           id: 'dropArea',
-          onclick: () => fileInput?.click(),
+          onclick: () => document.getElementById('fileInput')?.click(),
           ondragover: (e) => {
             e.preventDefault()
             this.dragover = true
@@ -141,9 +152,9 @@ export class UploadView {
             id: 'fileInput', 
             class: 'file-input', 
             accept: 'audio/mp3,audio/wav,audio/webm',
-            onchange: () => {
-              if (fileInput.files.length) {
-                this.handleFileSelect(fileInput.files[0])
+            onchange: (e) => {
+              if (e.target.files.length) {
+                this.handleFileSelect(e.target.files[0])
               }
             }
           })
