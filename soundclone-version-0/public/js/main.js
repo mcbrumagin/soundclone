@@ -7,12 +7,11 @@ import { RecordView } from './views/record.js'
 import { TrackDetailView } from './views/track-detail.js'
 import TrackManager from './track-manager.js'
 import AudioPlayer from './audio-player.js'
-import PlayerComponent from './player-component.js'
 
-const { div, header, span, input, h2, button } = tags
+const { div, header } = tags
 
 // Initialize audio player system
-let player, trackManager, playerComponent;
+let player, trackManager;
 
 // View instances
 const homeView = new HomeView()
@@ -76,11 +75,6 @@ window.renderApp = async () => {
   }
   
   render(App(content, currentView))
-}
-
-// Separate audio player rendering function
-window.renderAudioPlayer = () => {
-  renderPlayer(window.player.render())
 }
 
 // Global audio system for view access
@@ -176,7 +170,9 @@ const bootstrap = async () => {
   player.on('play', () => {
     appState.isPlaying = true
     // Update just the player UI, not the full app
-    setTimeout(() => renderAudioPlayer(), 0)
+    let track = trackManager.tracks.find(track => track.id === appState.currentlyPlayingTrackId)
+    console.log('track', track)
+    setTimeout(() => renderPlayer(window.player.render(track)), 0)
     // Only re-render track buttons when needed
     if (router.currentView === 'home') {
       setTimeout(() => renderApp(), 0)
@@ -185,7 +181,7 @@ const bootstrap = async () => {
   
   player.on('pause', () => {
     appState.isPlaying = false
-    setTimeout(() => renderAudioPlayer(), 0)
+    setTimeout(() => renderPlayer(window.player.render(track)), 0)
     if (router.currentView === 'home') {
       setTimeout(() => renderApp(), 0)
     }
@@ -194,7 +190,7 @@ const bootstrap = async () => {
   player.on('ended', () => {
     appState.isPlaying = false
     appState.currentlyPlayingTrackId = null
-    setTimeout(() => renderAudioPlayer(), 0)
+    setTimeout(() => renderPlayer(window.player.render(track)), 0)
     if (router.currentView === 'home') {
       setTimeout(() => renderApp(), 0)
     }
@@ -212,17 +208,17 @@ const bootstrap = async () => {
       volumeSlider: document.getElementById('volumeSlider')
     };
     
-    if (Object.values(playerElements).some(el => el)) {
-      playerComponent = new PlayerComponent(player, playerElements);
-      window.audioSystem.playerComponent = playerComponent // TODO gross
-    }
+    // if (Object.values(playerElements).some(el => el)) {
+    //   playerComponent = new PlayerComponent(player, playerElements);
+    //   window.audioSystem.playerComponent = playerComponent // TODO gross
+    // }
   }, 100);
 
   // Start with loading message
   render(div({ class: 'loading' }, 'Loading...'))
   
   // Render initial audio player
-  renderAudioPlayer()
+  renderPlayer(window.player.render())
   
   // Handle initial route
   handleRouteChange()

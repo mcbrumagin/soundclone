@@ -90,33 +90,88 @@ class AudioPlayer {
     this.listeners[event].push(callback);
   }
 
-  updatePlayer() {
-    if (window.audioSystem && window.audioSystem.playerUI) {
-      const playerElements = {
-        playButton: document.getElementById('playerPlayButton'),
-        progressSlider: document.getElementById('playerProgressSlider'),
-        timeDisplay: document.getElementById('playerTimeDisplay'),
-        volumeSlider: document.getElementById('volumeSlider')
-      };
-      
-      // Update the PlayerUI elements reference
-      if (Object.values(playerElements).some(el => el)) {
-        window.audioSystem.playerUI.elements = playerElements
-      }
+  // UI update methods
+  updateProgress({ currentTime, duration }) {
+    // Update progress slider
+    const progressSlider = document.getElementById('playerProgressSlider');
+    if (progressSlider && duration) {
+      const progress = (currentTime / duration) * 100;
+      progressSlider.value = progress || 0;
     }
     
-    // Update play button state without full re-render
-    const playButton = document.getElementById('playerPlayButton')
+    // Update time display
+    const timeDisplay = document.getElementById('playerTimeDisplay');
+    if (timeDisplay) {
+      const current = this.formatTime(currentTime || 0);
+      const total = this.formatTime(duration || 0);
+      timeDisplay.textContent = `${current} / ${total}`;
+    }
+  }
+
+  updatePlayButton(isPlaying) {
+    const playButton = document.getElementById('playerPlayButton');
     if (playButton) {
-      const icon = playButton.querySelector('span')
+      const icon = playButton.querySelector('span');
       if (icon) {
-        icon.textContent = appState.isPlaying ? '⏸' : '▶'
+        icon.textContent = isPlaying ? '⏸' : '▶';
       }
     }
   }
 
-  render() {
-    setTimeout(this.updatePlayer, 0) // TODO this is ugly
+  updateDuration(duration) {
+    const progressSlider = document.getElementById('playerProgressSlider');
+    if (progressSlider) {
+      progressSlider.max = 100;
+    }
+    
+    // Update time display to show total duration
+    const timeDisplay = document.getElementById('playerTimeDisplay');
+    if (timeDisplay && duration) {
+      timeDisplay.textContent = `0:00 / ${this.formatTime(duration)}`;
+    }
+  }
+
+  formatTime(seconds) {
+    if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  // Setup UI event listeners after render
+  setupUI(track) {
+    // Bind player events to update UI
+    this.on('timeupdate', (data) => {
+      if (track) data.duration = track.duration
+      console.log('timeupdate', data)
+      this.updateProgress(data);
+    });
+
+    this.on('loaded', (data) => {
+      this.updateDuration(data.duration);
+    });
+
+    this.on('play', () => {
+      this.updatePlayButton(true);
+    });
+
+    this.on('pause', () => {
+      this.updatePlayButton(false);
+    });
+
+    this.on('ended', () => {
+      this.updatePlayButton(false);
+    });
+
+    this.on('error', (error) => {
+      console.error('Player UI error:', error);
+      this.updatePlayButton(false);
+    });
+  }
+
+  render(track) {
+    // Setup UI event listeners after render
+    setTimeout(() => this.setupUI(track), 0);
 
     return div({ class: 'audio-player' },
       div({ class: 'player-controls' },
