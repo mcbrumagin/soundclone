@@ -3,7 +3,7 @@ import { uploadTrack } from '../api.js'
 
 const { main, h1, div, i, p, input, label, textarea, button, span, a } = tags
 
-export class UploadView {
+export default class UploadView {
   constructor() {
     this.selectedFile = null
     this.dragover = false
@@ -43,7 +43,7 @@ export class UploadView {
     }
     
     // Re-render to show file info
-    renderApp()
+    window.renderApp()
   }
 
   async handleUpload() {
@@ -73,7 +73,7 @@ export class UploadView {
     }
     
     this.uploading = true
-    renderApp()
+    window.renderApp()
     
     try {
       const track = await uploadTrack(formData)
@@ -91,7 +91,7 @@ export class UploadView {
       alert('Failed to upload track. Please try again.')
     } finally {
       this.uploading = false
-      renderApp()
+      window.renderApp()
     }
   }
 
@@ -131,11 +131,11 @@ export class UploadView {
           ondragover: (e) => {
             e.preventDefault()
             this.dragover = true
-            renderApp()
+            window.renderApp()
           },
           ondragleave: () => {
             this.dragover = false
-            renderApp()
+            window.renderApp()
           },
           ondrop: (e) => {
             e.preventDefault()

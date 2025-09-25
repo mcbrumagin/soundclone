@@ -2,8 +2,8 @@ import { tags } from 'micro-js-html'
 
 const { nav, a, i } = tags
 
-export const Navigation = (currentView) =>
-  nav({ class: 'nav-links' },
+export default function Navigation (currentView) {
+  return nav({ class: 'nav-links' },
     a({ 
       class: currentView === 'home' ? 'active' : '', 
       href: '#home',
@@ -24,3 +24,4 @@ export const Navigation = (currentView) =>
       i({ class: 'fas fa-microphone' }), ' Record'
     )
   )
+}

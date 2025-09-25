@@ -1,20 +1,19 @@
 import { tags, renderHelper } from 'micro-js-html'
 // Removed router import - using simple hashchange handler
-import { Navigation } from './components/navigation.js'
-import { HomeView } from './views/home.js'
-import { UploadView } from './views/upload.js'
-import { RecordView } from './views/record.js'
-import { TrackDetailView } from './views/track-detail.js'
-import TrackManager from './track-manager.js'
+import Navigation from './components/navigation.js'
+import HomeView from './views/home.js'
+import UploadView from './views/upload.js'
+import RecordView from './views/record.js'
+import TrackDetailView from './views/track-detail.js'
 import AudioPlayer from './audio-player.js'
+import { getTracks } from './api.js'
 
 const { div, header } = tags
 
-// Initialize audio player system
-let player, trackManager
+window.player = new AudioPlayer()
 
 // View instances
-const homeView = new HomeView()
+const homeView = new HomeView(window.player)
 const uploadView = new UploadView()
 const recordView = new RecordView()
 const trackDetailView = new TrackDetailView()
@@ -32,8 +31,10 @@ const appState = {
 }
 window.appState = appState
 
+// TODO, targeted render helpers as part of component render fns
 const render = renderHelper('#app')
-const renderPlayer = renderHelper('#audio-player')
+window.renderPlayer = renderHelper('#audio-player')
+
 
 
 // Simple render helper
@@ -41,30 +42,33 @@ window.renderApp = async () => {
   console.log('Rendering app for view:', router.currentView)
   const currentView = router.currentView
   let content
+
+  if (!window.tracks || window.tracks.length === 0) {
+    try {
+      window.tracks = await getTracks()
+      console.log('Tracks loaded from API:', window.tracks)
+    } catch (err) {
+      console.error('Error loading tracks:', err)
+      throw err
+    }
+  }
   
   try {
     switch(currentView) {
       case 'home': 
         // Load tracks if needed
-        if (homeView.tracks.length === 0) {
-          window.tracks = await homeView.loadTracks()
-        }
         content = div({ class: 'track-list' }, homeView.render())
         break
-      case 'upload': 
+      case 'upload':
         content = uploadView.render()
-        // setTimeout(() => uploadView.setupEventListeners(), 0)
         break
-      case 'record': 
+      case 'record':
         content = recordView.render()
         break
-      case 'track-detail': 
-        // Load track details if needed
-        if (router.currentTrackId && (!trackDetailView.currentTrack || trackDetailView.currentTrack.id !== router.currentTrackId)) {
-          await trackDetailView.loadTrack(router.currentTrackId)
-        }
-        content = trackDetailView.render()
-        setTimeout(() => trackDetailView.setupEventListeners(), 0)
+      case 'track-detail':
+        // TODO tracks should be global state?
+        let track = window.tracks.find(track => track.id === router.currentTrackId)
+        content = trackDetailView.render(track)
         break
       default:
         content = div({ class: 'loading' }, 'Loading...')
@@ -77,28 +81,7 @@ window.renderApp = async () => {
   render(App(content, currentView))
 }
 
-// Global audio system for view access
-window.audioSystem = {
-  player: null,
-  trackManager: null,
-  playerComponent: null,
-  loadTrack: (track, autoplay = false) => {
-    console.log('Loading track:', track)
-    // Implementation will be added when audio system is ready
-  },
-  play: () => {
-    console.log('Play requested')
-    // Implementation will be added when audio system is ready
-  },
-  togglePlayPause: () => {
-    console.log('Toggle play/pause requested')
-    // Implementation will be added when audio system is ready
-  },
-  seekTo: (time) => {
-    console.log('Seek to:', time)
-    // Implementation will be added when audio system is ready
-  }
-}
+
 
 // Simple hash-based routing
 const handleRouteChange = () => {
@@ -109,7 +92,7 @@ const handleRouteChange = () => {
   router.currentTrackId = params[0] || null
   
   console.log('Route changed to:', view, params)
-  renderApp()
+  window.renderApp()
 }
 
 // Set up routing
@@ -126,78 +109,7 @@ const App = (viewContent, currentView) =>
     viewContent
   )
 
-// Audio Player UI Component
-// TODO? AudioPlayerUI
-
 const bootstrap = async () => {
-  // Initialize audio player system
-  player = new AudioPlayer()
-  window.player = player // TODO
-
-  trackManager = new TrackManager(player)
-  
-  // Update global audio system
-  window.audioSystem.player = player
-  window.audioSystem.trackManager = trackManager
-  window.audioSystem.loadTrack = (track, autoplay = false) => {
-    player.loadTrack(track)
-    appState.currentlyPlayingTrackId = track.id || null
-    if (autoplay) {
-      player.play()
-    }
-  }
-  window.audioSystem.play = () => player.play()
-  window.audioSystem.togglePlayPause = () => {
-    if (player.isPlaying) {
-      player.pause()
-    } else {
-      // If no track is loaded, load the first available track
-      if (!player.currentTrack && trackManager.tracks.length > 0) {
-        const firstTrack = trackManager.tracks[0]
-        window.audioSystem.loadTrack(firstTrack, true) // autoplay = true
-      } else {
-        player.play()
-      }
-    }
-  }
-  window.audioSystem.seekTo = (time) => {
-    if (player.audio && !isNaN(time) && isFinite(time) && time >= 0) {
-      player.audio.currentTime = time
-    }
-  }
-  
-  // Listen for play/pause events to update global state
-  player.on('play', () => {
-    appState.isPlaying = true
-    // Update just the player UI, not the full app
-    let track = trackManager.tracks.find(track => track.id === appState.currentlyPlayingTrackId)
-    console.log('track', track)
-    setTimeout(() => renderPlayer(window.player.render(track)), 0)
-    // Only re-render track buttons when needed
-    if (router.currentView === 'home') {
-      setTimeout(() => renderApp(), 0)
-    }
-  })
-  
-  player.on('pause', () => {
-    appState.isPlaying = false
-    setTimeout(() => renderPlayer(window.player.render(track)), 0)
-    if (router.currentView === 'home') {
-      setTimeout(() => renderApp(), 0)
-    }
-  })
-  
-  player.on('ended', () => {
-    appState.isPlaying = false
-    appState.currentlyPlayingTrackId = null
-    setTimeout(() => renderPlayer(window.player.render(track)), 0)
-    if (router.currentView === 'home') {
-      setTimeout(() => renderApp(), 0)
-    }
-  })
-  
-  // Pass audio system to home view
-  homeView.audioSystem = window.audioSystem
 
   // Start with loading message
   render(div({ class: 'loading' }, 'Loading...'))

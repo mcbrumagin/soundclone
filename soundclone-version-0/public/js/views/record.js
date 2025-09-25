@@ -3,7 +3,7 @@ import { uploadTrack } from '../api.js'
 
 const { main, h1, div, i, input, label, textarea, button, a } = tags
 
-export class RecordView {
+export default class RecordView {
   constructor() {
     this.isRecording = false
     this.recordTime = '00:00'
@@ -42,7 +42,7 @@ export class RecordView {
 
         // Load as current track for preview
         if (window.audioSystem) {
-          window.audioSystem.loadTrack({
+          window.player.loadTrack({
             title: 'New Recording',
             audioUrl: this.recordingUrl
           }, false)
@@ -55,7 +55,7 @@ export class RecordView {
           titleInput.value = `Recording ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`
         }
         
-        renderApp()
+        window.renderApp()
       }
       
       // Start recording
@@ -70,7 +70,7 @@ export class RecordView {
       // Simulate audio level visualization
       this.simulateAudioLevel()
       
-      renderApp()
+      window.renderApp()
     } catch (error) {
       console.error('Error accessing microphone:', error)
       alert('Could not access microphone. Please ensure you have granted permission.')
@@ -88,7 +88,7 @@ export class RecordView {
       // Stop timer
       clearInterval(this.recordingTimer)
       
-      renderApp()
+      window.renderApp()
     }
   }
 
@@ -151,7 +151,7 @@ export class RecordView {
       if (titleInput) titleInput.value = ''
       if (descriptionInput) descriptionInput.value = ''
       
-      renderApp()
+      window.renderApp()
     }
   }
 
@@ -204,8 +204,6 @@ export class RecordView {
     }
   }
 
-
-
   render() {
     return main({ class: 'container' },
       a({ class: 'back-button', 'data-view': 'home', href: '#home' },
@@ -234,9 +232,7 @@ export class RecordView {
               id: 'playButton', 
               disabled: !this.recordingUrl,
               onclick: () => {
-                if (this.recordingUrl && window.audioSystem) {
-                  window.audioSystem.togglePlayPause()
-                }
+                window.player.toggle()
               }
             },
               i({ class: window.appState && window.appState.isPlaying ? 'fas fa-pause' : 'fas fa-play' }), 

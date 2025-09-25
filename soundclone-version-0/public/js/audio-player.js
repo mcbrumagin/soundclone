@@ -26,7 +26,10 @@ class AudioPlayer {
     try {
       await this.audio.play()
       this.isPlaying = true
-      this.emit('play')
+      appState.isPlaying = true // TODO gross
+      appState.currentlyPlayingTrackId = this.currentTrack.id
+      window.renderApp()
+      window.renderPlayer(this.render())
       return true
     } catch (error) {
       console.error('Playback failed:', error)
@@ -37,7 +40,10 @@ class AudioPlayer {
   pause() {
     this.audio.pause()
     this.isPlaying = false
-    this.emit('pause')
+    appState.isPlaying = false // TODO gross
+    // appState.currentlyPlayingTrackId = null
+    window.renderApp()
+    window.renderPlayer(this.render())
   }
 
   toggle() {
@@ -63,7 +69,7 @@ class AudioPlayer {
 
     this.audio.addEventListener('ended', () => {
       this.isPlaying = false
-      this.emit('ended')
+      window.renderApp()
     })
 
     this.audio.addEventListener('loadedmetadata', () => {
@@ -138,12 +144,18 @@ class AudioPlayer {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
+  seekTo(time) {
+    if (this.audio && !isNaN(time) && isFinite(time) && time >= 0) {
+      this.audio.currentTime = time
+    }
+  }
+
   // Setup UI event listeners after render
   setupUI(track) {
     // Bind player events to update UI
     this.on('timeupdate', (data) => {
       if (track) data.duration = track.duration
-      console.log('timeupdate', data)
+      // console.log('timeupdate', data)
       this.updateProgress(data)
     })
 
@@ -171,7 +183,10 @@ class AudioPlayer {
 
   render(track) {
     // Setup UI event listeners after render
-    setTimeout(() => this.setupUI(track), 0)
+
+    // TODO REMOVE THIS
+    // setTimeout(() => this.setupUI(track), 0)
+    this.setupUI(track)
 
     return div({ class: 'audio-player' },
       div({ class: 'player-controls' },
@@ -179,9 +194,7 @@ class AudioPlayer {
           id: 'playerPlayButton', 
           class: 'play-button',
           onclick: () => {
-            if (window.audioSystem && window.audioSystem.togglePlayPause) {
-              window.audioSystem.togglePlayPause()
-            }
+            this.toggle()
           }
         }, 
           span({}, appState.isPlaying ? '⏸' : '▶')
@@ -195,14 +208,12 @@ class AudioPlayer {
             max: '100', 
             value: '0',
             oninput: (e) => {
-              if (window.audioSystem && window.audioSystem.player && window.audioSystem.player.audio) {
-                const duration = track.duration
-                console.log('Duration:', duration)
-                if (duration && !isNaN(duration) && isFinite(duration)) {
-                  const seekTime = (parseFloat(e.target.value) / 100) * duration
-                  if (!isNaN(seekTime) && isFinite(seekTime)) {
-                    window.audioSystem.seekTo(seekTime)
-                  }
+              const duration = track.duration
+              console.log('Duration:', duration)
+              if (duration && !isNaN(duration) && isFinite(duration)) {
+                const seekTime = (parseFloat(e.target.value) / 100) * duration
+                if (!isNaN(seekTime) && isFinite(seekTime)) {
+                  this.seekTo(seekTime)
                 }
               }
             }
@@ -220,9 +231,7 @@ class AudioPlayer {
             step: '0.1', 
             value: '1',
             oninput: (e) => {
-              if (window.audioSystem && window.audioSystem.player) {
-                window.audioSystem.player.setVolume(parseFloat(e.target.value))
-              }
+              this.setVolume(parseFloat(e.target.value))
             }
           })
         )

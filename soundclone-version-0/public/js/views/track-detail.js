@@ -3,54 +3,10 @@ import { getTrack, updateTrack, deleteTrack, addComment, updateComment, deleteCo
 
 const { main, h1, div, i, input, textarea, button, a, h2, p } = tags
 
-const CommentComponent = (comment) => {
-  const formattedDate = new Date(comment.timestamp).toLocaleDateString()
-  
-  // Format comment text to make timestamp tags clickable
-  let commentText = comment.text
-  if (comment.hasTimestamp) {
-    const regex = /@(\d{2}):(\d{2})/g
-    commentText = commentText.replace(regex, '<span class="timestamp-tag">@$1:$2</span>')
-  }
-  
-  return div({ class: 'comment' },
-    div({ class: 'comment-header' },
-      div({ class: 'comment-date' }, formattedDate)
-    ),
-    div({ class: 'comment-text', innerHTML: commentText }),
-    div({ class: 'comment-actions' },
-      button({ class: 'secondary edit-comment', 'data-comment-id': comment.id }, 'Edit'),
-      button({ class: 'secondary delete-comment', 'data-comment-id': comment.id }, 'Delete')
-    )
-  )
-}
-
-export class TrackDetailView {
+export default class TrackDetailView {
   constructor() {
-    this.currentTrack = null
-    this.comments = []
     this.waveformProgress = 0
     this.currentTime = 0
-  }
-
-  async loadTrack(trackId) {
-    try {
-      this.currentTrack = await getTrack(trackId)
-      this.comments = this.currentTrack.comments || []
-      
-      // Load track into audio system if available
-      if (window.audioSystem && window.audioSystem.trackManager) {
-        const track = window.audioSystem.trackManager.getTrack(trackId)
-        if (track) {
-          window.audioSystem.loadTrack(track, false) // Load but don't autoplay
-        }
-      }
-      
-      return this.currentTrack
-    } catch (error) {
-      console.error('Error loading track details:', error)
-      throw error
-    }
   }
 
   updateWaveformProgress(currentTime, duration) {
@@ -107,7 +63,7 @@ export class TrackDetailView {
         
           // Update local state
           this.currentTrack = updatedTrack
-          renderApp()
+          window.renderApp()
         } catch (error) {
           console.error('Error updating track:', error)
           alert('Failed to update track. Please try again.')
@@ -143,7 +99,7 @@ export class TrackDetailView {
         this.comments.push(newComment)
         commentInput.value = ''
         
-        renderApp()
+        window.renderApp()
       } catch (error) {
         console.error('Error adding comment:', error)
         alert('Failed to add comment. Please try again.')
@@ -165,28 +121,7 @@ export class TrackDetailView {
   }
 
   setupEventListeners() {
-    const shareButton = document.getElementById('shareButton')
-    const editButton = document.getElementById('editButton')
-    const deleteButton = document.getElementById('deleteButton')
-    const addCommentButton = document.getElementById('addCommentButton')
     const waveformSeeker = document.getElementById('waveformSeeker')
-    const commentList = document.getElementById('commentList')
-    
-    if (shareButton) {
-      shareButton.addEventListener('click', () => this.handleShare())
-    }
-    
-    if (editButton) {
-      editButton.addEventListener('click', () => this.handleEdit())
-    }
-    
-    if (deleteButton) {
-      deleteButton.addEventListener('click', () => this.handleDelete())
-    }
-    
-    if (addCommentButton) {
-      addCommentButton.addEventListener('click', () => this.handleAddComment())
-    }
     
     if (waveformSeeker) {
       waveformSeeker.addEventListener('input', (e) => {
@@ -197,48 +132,35 @@ export class TrackDetailView {
         }
       })
     }
-    
-    if (commentList) {
-      commentList.addEventListener('click', (e) => {
-        // Handle timestamp clicks
-        if (e.target.classList.contains('timestamp-tag')) {
-          this.handleTimestampClick(e.target.textContent)
-        }
-        
-        // Handle comment edit/delete
-        const editBtn = e.target.closest('.edit-comment')
-        const deleteBtn = e.target.closest('.delete-comment')
-        
-        if (editBtn) {
-          const commentId = editBtn.getAttribute('data-comment-id')
-          const comment = this.comments.find(c => c.id === commentId)
-          if (comment) {
-            const newText = prompt('Edit your comment:', comment.text)
-            if (newText !== null && newText.trim() !== '') {
-              comment.text = newText
-              comment.hasTimestamp = /@\d{2}:\d{2}/.test(newText)
-              renderApp()
-            }
-          }
-        }
-        
-        if (deleteBtn) {
-          const commentId = deleteBtn.getAttribute('data-comment-id')
-          if (confirm('Are you sure you want to delete this comment?')) {
-            this.comments = this.comments.filter(c => c.id !== commentId)
-            renderApp()
-          }
-        }
-      })
-    }
   }
 
-  render() {
-    if (!this.currentTrack) {
-      return div({ class: 'loading' }, 'Loading track details...')
+  renderComment(comment) {
+    const formattedDate = new Date(comment.timestamp).toLocaleDateString()
+    
+    // Format comment text to make timestamp tags clickable
+    let commentText = comment.text
+    if (comment.hasTimestamp) {
+      const regex = /@(\d{2}):(\d{2})/g
+      commentText = commentText.replace(regex, '<span class="timestamp-tag">@$1:$2</span>')
     }
+    
+    return div({ class: 'comment', onclick: (e) => {
+      this.handleCommentClick(e)
+    }},
+      div({ class: 'comment-header' },
+        div({ class: 'comment-date' }, formattedDate)
+      ),
+      div({ class: 'comment-text', innerHTML: commentText }),
+      div({ class: 'comment-actions' },
+        button({ class: 'secondary edit-comment', 'data-comment-id': comment.id, onclick: (e) => this.handleCommentEdit(e) }, 'Edit'),
+        button({ class: 'secondary delete-comment', 'data-comment-id': comment.id, onclick: (e) => this.handleCommentDelete(e) }, 'Delete')
+      )
+    )
+  }
 
-    const formattedDate = new Date(this.currentTrack.createdAt).toLocaleDateString()
+  render(track) {
+    console.log('track detail view render', track)
+    const formattedDate = new Date(track.createdAt).toLocaleDateString()
 
     return main({ class: 'container' },
       a({ class: 'back-button', 'data-view': 'home', href: '#home' },
@@ -247,18 +169,18 @@ export class TrackDetailView {
       div({ class: 'track-detail', id: 'trackDetail' },
         div({ class: 'track-detail-header' },
           div({ class: 'track-info' },
-            h1({ class: 'track-title' }, this.currentTrack.title),
-            p({ class: 'track-description' }, this.currentTrack.description || 'No description'),
+            h1({ class: 'track-title' }, track.title),
+            p({ class: 'track-description' }, track.description || 'No description'),
             p({ class: 'track-meta' }, `Created: ${formattedDate}`)
           ),
           div({ class: 'track-actions' },
-            button({ id: 'shareButton' },
+            button({ id: 'shareButton', onclick: () => this.handleShare() },
               i({ class: 'fas fa-share-alt' }), ' Share'
             ),
-            button({ class: 'secondary', id: 'editButton' },
+            button({ class: 'secondary', id: 'editButton', onclick: () => this.handleEdit() },
               i({ class: 'fas fa-edit' }), ' Edit'
             ),
-            button({ class: 'secondary', id: 'deleteButton' },
+            button({ class: 'secondary', id: 'deleteButton', onclick: () => this.handleDelete() },
               i({ class: 'fas fa-trash' }), ' Delete'
             )
           )
@@ -287,12 +209,12 @@ export class TrackDetailView {
             id: 'commentInput', 
             placeholder: 'Add a comment... Use @mm:ss to tag a timestamp'
           }),
-          button({ id: 'addCommentButton' }, 'Add Comment')
+          button({ id: 'addCommentButton', onclick: () => this.handleAddComment() }, 'Add Comment')
         ),
         div({ class: 'comment-list', id: 'commentList' },
-          this.comments.length === 0 
+          track.comments.length === 0 
             ? div({ class: 'empty-state' }, 'No comments yet. Be the first to comment!')
-            : this.comments.map(CommentComponent)
+            : track.comments.map(comment => this.renderComment(comment))
         )
       )
     )

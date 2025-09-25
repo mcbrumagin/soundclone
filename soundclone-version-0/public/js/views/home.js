@@ -1,5 +1,4 @@
 import { tags } from 'micro-js-html'
-import { getTracks } from '../api.js'
 
 const { div, h2, button, a, header, i } = tags
 
@@ -11,111 +10,91 @@ const formatTime = (seconds) => {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
 }
 
-const TrackCard = (track, playTrack, isCurrentlyPlaying, isPlaying) => {
-  const isThisTrackPlaying = isCurrentlyPlaying && isPlaying
-  
-  return div({ class: 'track-card' },
-    div({ class: 'track-card-header' },
-      h2({ class: 'track-title' }, track.title),
-      div({ class: 'track-date' }, 
-        `${new Date(track.createdAt).toLocaleDateString()} - ${formatTime(track.duration || 0)}`
-      )
-    ),
-    div({ class: 'track-actions' },
-      button({ 
-        class: `play-track ${isThisTrackPlaying ? 'playing' : ''}`, 
-        onClick: () => playTrack(track.id) 
-      }, 
-        i({ class: isThisTrackPlaying ? 'fas fa-pause' : 'fas fa-play' }), 
-        isThisTrackPlaying ? ' Pause' : ' Play'
-      ),
-      a({ 
-        class: 'secondary view-track', 
-        'data-view': 'track-detail',
-        'data-track-id': track.id,
-        href: `#track-detail/${track.id}` 
-      }, 'View Details')
-    )
-  )
-}
-
-export class HomeView {
-  constructor(audioSystem) {
-    this.tracks = []
-    this.audioSystem = audioSystem
+export default class HomeView {
+  constructor(player) {
+    this.player = player
   }
 
-  async loadTracks() {
-    try {
-      this.tracks = await getTracks()
-      console.log('Tracks loaded from API:', this.tracks)
-      
-      // Load tracks into TrackManager
-      if (this.audioSystem.trackManager) {
-        await this.audioSystem.trackManager.loadTracks()
-        console.log('Tracks loaded into TrackManager:', this.audioSystem.trackManager.tracks)
-      }
-      
-      return this.tracks
-    } catch (err) {
-      console.error('Error loading tracks:', err)
-      throw err
-    }
-  }
-
-  async playTrack(id) {
-    console.log('Play button clicked for track:', id)
-    
-    if (!this.audioSystem.trackManager) {
-      console.error('TrackManager not initialized')
-      return
-    }
-
-    try {
-      // Check if this track is already playing
-      if (window.appState && window.appState.currentlyPlayingTrackId === id && window.appState.isPlaying) {
-        // If it's playing, pause it
-        this.audioSystem.player.pause()
-        return
-      }
-
-      // Get the track data
-      const track = this.audioSystem.trackManager.getTrack(id)
-      if (!track) {
-        console.error('Track not found:', id)
-        console.log('Available track IDs:', this.audioSystem.trackManager.tracks.map(t => t.id))
-        return
-      }
-
-      console.log('Loading track:', track)
-      
-      // Load the track into the player (this updates currentlyPlayingTrackId)
-      this.audioSystem.loadTrack(track, false)
-      
-      // Attempt to play
-      const success = await this.audioSystem.player.play()
-      if (success) {
-        console.log('Track started playing successfully')
+  togglePlayPause() {
+    if (this.player.isPlaying) {
+      player.pause()
+    } else {
+      // If no track is loaded, load the first available track
+      if (!player.currentTrack && window.tracks.length > 0) {
+        const firstTrack = window.tracks[0]
+        this.loadTrack(firstTrack, true) // autoplay = true
       } else {
-        console.error('Failed to start playback')
+        player.play()
       }
-    } catch (error) {
-      console.error('Error playing track:', error)
     }
+  }
+
+  loadTrack(track, autoplay = false) {
+    this.player.loadTrack(track)
+    appState.currentlyPlayingTrackId = track.id || null
+    if (autoplay) {
+      player.play()
+    }
+  }
+
+  playTrackById(id) {
+    const track = window.tracks.find(t => t.id === id)
+    if (track) {
+      console.log('Playing track:', track)
+      this.player.loadTrack(track)
+      appState.isPlaying = true
+      appState.currentlyPlayingTrackId = id
+      return this.player.play()
+    }
+    console.error('Track not found:', id)
+    return false
+  }
+
+  renderTrackCard(track) {
+    const { isPlaying, currentlyPlayingTrackId } = window.appState
+    const isThisTrackPlaying = isPlaying && currentlyPlayingTrackId === track.id
+    const isThisTrackPaused = !isPlaying && currentlyPlayingTrackId === track.id
+    
+    console.log('isThisTrackPlaying', isThisTrackPlaying)
+    console.log('track.id', track.id)
+    console.log('isPlaying', isPlaying)
+    console.log('currentlyPlayingTrackId', currentlyPlayingTrackId)
+
+    return div({ class: 'track-card' },
+      div({ class: 'track-card-header' },
+        h2({ class: 'track-title' }, track.title),
+        div({ class: 'track-date' }, 
+          `${new Date(track.createdAt).toLocaleDateString()} - ${formatTime(track.duration || 0)}`
+        )
+      ),
+      div({ class: 'track-actions' },
+        button({ 
+          class: `play-track ${isThisTrackPlaying ? 'playing' : ''}`, 
+          onClick: () => {
+            if (isThisTrackPlaying) this.player.pause()
+            else this.playTrackById(track.id)
+          }
+        }, 
+          i({ class: isThisTrackPlaying ? 'fas fa-pause' : 'fas fa-play' }), 
+          isThisTrackPlaying ? ' Pause' : isThisTrackPaused ? 'Resume' : ' Play'
+        ),
+        a({ 
+          class: 'secondary view-track', 
+          'data-view': 'track-detail',
+          'data-track-id': track.id,
+          href: `#track-detail/${track.id}` 
+        }, 'View Details')
+      )
+    )
   }
 
   render() {
-    if (this.tracks.length === 0) {
+    if (window.tracks.length === 0) {
       return div({ class: 'loading' }, 'Loading...')
     }
 
     return div({ class: 'track-list' }, 
-      ...this.tracks.map(track => TrackCard(
-        track, 
-        (id) => this.playTrack(id),
-        window.appState && window.appState.currentlyPlayingTrackId === track.id,
-        window.appState && window.appState.isPlaying
-      ))
+      ...window.tracks.map(track => this.renderTrackCard(track))
     )
   }
 }
