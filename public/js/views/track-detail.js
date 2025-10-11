@@ -1,7 +1,7 @@
-import { tags } from 'micro-js-html'
+import { htmlTags } from 'micro-js-html'
 import { getTrack, updateTrack, deleteTrack, addComment, updateComment, deleteComment } from '../api.js'
 
-const { main, h1, div, i, input, textarea, button, a, h2, p } = tags
+const { main, h1, div, i, input, textarea, button, a, h2, p } = htmlTags
 
 export default class TrackDetailView {
   constructor() {

@@ -1,7 +1,7 @@
-import { tags } from 'micro-js-html'
+import { htmlTags } from 'micro-js-html'
 import { uploadTrack } from '../api.js'
 
-const { main, h1, div, i, input, label, textarea, button, a } = tags
+const { main, h1, div, i, input, label, textarea, button, a } = htmlTags
 
 export default class RecordView {
   constructor() {

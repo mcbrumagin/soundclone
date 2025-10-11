@@ -1,4 +1,5 @@
-import { tags, renderHelper } from 'micro-js-html'
+import { htmlTags } from 'micro-js-html'
+import renderHelper from './render-helper.js'
 // Removed router import - using simple hashchange handler
 import Navigation from './components/navigation.js'
 import HomeView from './views/home.js'
@@ -8,15 +9,17 @@ import TrackDetailView from './views/track-detail.js'
 import AudioPlayer from './audio-player.js'
 import { getTracks } from './api.js'
 
-const { div, header } = tags
+const { div, header } = htmlTags
 
-window.player = new AudioPlayer()
+const player = new AudioPlayer()
 
 // View instances
-const homeView = new HomeView(window.player)
-const uploadView = new UploadView()
-const recordView = new RecordView()
-const trackDetailView = new TrackDetailView()
+const homeView = new HomeView(player)
+
+// TODO implement player in all views
+const uploadView = new UploadView(player)
+const recordView = new RecordView(player)
+const trackDetailView = new TrackDetailView(player)
 
 // Simple router state
 const router = {
@@ -31,30 +34,14 @@ const appState = {
 }
 window.appState = appState
 
+
 // TODO, targeted render helpers as part of component render fns
-const render = renderHelper('#app')
-window.renderPlayer = renderHelper('#audio-player')
-
-
-
-// Simple render helper
-window.renderApp = async () => {
-  console.log('Rendering app for view:', router.currentView)
-  const currentView = router.currentView
+const App = () => {
   let content
 
-  if (!window.tracks || window.tracks.length === 0) {
-    try {
-      window.tracks = await getTracks()
-      console.log('Tracks loaded from API:', window.tracks)
-    } catch (err) {
-      console.error('Error loading tracks:', err)
-      throw err
-    }
-  }
   
   try {
-    switch(currentView) {
+    switch(router.currentView) {
       case 'home': 
         // Load tracks if needed
         content = div({ class: 'track-list' }, homeView.render())
@@ -78,9 +65,22 @@ window.renderApp = async () => {
     content = div({ class: 'error-message' }, `Failed to load ${currentView} view`)
   }
   
-  render(App(content, currentView))
+  return div({ class: 'app' },
+    header({ class: 'container header-content' },
+      div({ class: 'logo' }, 'SoundClone v0'),
+      Navigation(router.currentView)
+    ),
+    content
+  )
 }
 
+window.renderApp = renderHelper('#app', App)
+
+// TODO renderHelper should support classes with render methods
+window.renderPlayer = renderHelper(
+  '#audio-player',
+  player.render.bind(player) // for now we bind the method to the instance
+)
 
 
 // Simple hash-based routing
@@ -100,22 +100,31 @@ window.addEventListener('hashchange', handleRouteChange)
 window.addEventListener('popstate', handleRouteChange)
 
 // Main App Component
-const App = (viewContent, currentView) =>
-  div({ class: 'app' },
-    header({ class: 'container header-content' },
-      div({ class: 'logo' }, 'SoundClone v0'),
-      Navigation(currentView)
-    ),
-    viewContent
-  )
+// const App = (viewContent, currentView) =>
+//   div({ class: 'app' },
+//     header({ class: 'container header-content' },
+//       div({ class: 'logo' }, 'SoundClone v0'),
+//       Navigation(currentView)
+//     ),
+//     viewContent
+//   )
 
 const bootstrap = async () => {
 
-  // Start with loading message
-  render(div({ class: 'loading' }, 'Loading...'))
+  if (!window.tracks || window.tracks.length === 0) {
+    try {
+      window.tracks = await getTracks()
+      console.log('Tracks loaded from API:', window.tracks)
+    } catch (err) {
+      console.error('Error loading tracks:', err)
+      throw err
+    }
+  }
+
+  await window.renderApp(div({ class: 'loading' }, 'Loading...'))
   
   // Render initial audio player
-  renderPlayer(window.player.render())
+  window.renderPlayer()
   
   // Handle initial route
   handleRouteChange()

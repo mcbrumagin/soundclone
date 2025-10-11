@@ -1,5 +1,5 @@
-import { tags } from 'micro-js-html'
-const { div, input, button, span } = tags
+import { htmlTags } from 'micro-js-html'
+const { div, input, button, span } = htmlTags
 
 class AudioPlayer {
   constructor() {

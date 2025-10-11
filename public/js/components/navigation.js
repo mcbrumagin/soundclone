@@ -1,6 +1,6 @@
-import { tags } from 'micro-js-html'
+import { htmlTags } from 'micro-js-html'
 
-const { nav, a, i } = tags
+const { nav, a, i } = htmlTags
 
 export default function Navigation (currentView) {
   return nav({ class: 'nav-links' },

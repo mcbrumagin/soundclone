@@ -1,6 +1,6 @@
-import { tags } from 'micro-js-html'
+import { htmlTags } from 'micro-js-html'
 
-const { div, h2, button, a, header, i } = tags
+const { div, h2, button, a, header, i } = htmlTags
 
 // Format seconds to mm:ss
 const formatTime = (seconds) => {

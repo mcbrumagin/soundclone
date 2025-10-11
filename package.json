@@ -2,17 +2,14 @@
   "name": "soundclone-version-0",
   "version": "0.0.1",
   "description": "SoundClone v0 - Minimal hybrid of SoundCloud and voice memo app",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
   },
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "express-fileupload": "^1.4.0",
-    "micro-js-html": "file:../micro-js-html",
-    "morgan": "^1.10.0",
-    "uuid": "^9.0.1"
+    "micro-js": "^0.1.1",
+    "micro-js-html": "^0.0.5"
   }
 }
