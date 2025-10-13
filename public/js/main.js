@@ -28,18 +28,16 @@ const router = {
 }
 
 // Global app state
-const appState = {
+window.appState = {
   currentlyPlayingTrackId: null,
-  isPlaying: false
+  isPlaying: false,
+  currentTrack: null // TODO
 }
-window.appState = appState
-
 
 // TODO, targeted render helpers as part of component render fns
 const App = () => {
   let content
 
-  
   try {
     switch(router.currentView) {
       case 'home': 

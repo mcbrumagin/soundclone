@@ -37,19 +37,6 @@ export default class HomeView {
     }
   }
 
-  playTrackById(id) {
-    const track = window.tracks.find(t => t.id === id)
-    if (track) {
-      console.log('Playing track:', track)
-      this.player.loadTrack(track)
-      appState.isPlaying = true
-      appState.currentlyPlayingTrackId = id
-      return this.player.play()
-    }
-    console.error('Track not found:', id)
-    return false
-  }
-
   renderTrackCard(track) {
     const { isPlaying, currentlyPlayingTrackId } = window.appState
     const isThisTrackPlaying = isPlaying && currentlyPlayingTrackId === track.id
@@ -57,6 +44,7 @@ export default class HomeView {
     
     console.log('isThisTrackPlaying', isThisTrackPlaying)
     console.log('track.id', track.id)
+    console.log({track})
     console.log('isPlaying', isPlaying)
     console.log('currentlyPlayingTrackId', currentlyPlayingTrackId)
 
@@ -72,7 +60,8 @@ export default class HomeView {
           class: `play-track ${isThisTrackPlaying ? 'playing' : ''}`, 
           onClick: () => {
             if (isThisTrackPlaying) this.player.pause()
-            else this.playTrackById(track.id)
+            else this.player.play(track.id)
+            // else this.playTrackById(track.id)
           }
         }, 
           i({ class: isThisTrackPlaying ? 'fas fa-pause' : 'fas fa-play' }), 
