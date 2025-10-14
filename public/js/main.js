@@ -24,43 +24,35 @@ const trackDetailView = new TrackDetailView(player)
 // Simple router state
 const router = {
   currentView: 'home',
-  currentTrackId: null
+  currentTrackId: null // only for router
 }
 
 // Global app state
 window.appState = {
-  currentlyPlayingTrackId: null,
-  isPlaying: false,
-  currentTrack: null // TODO
+  tracks: [], // will init
+  player
 }
 
 // TODO, targeted render helpers as part of component render fns
 const App = () => {
   let content
-
-  try {
-    switch(router.currentView) {
-      case 'home': 
-        // Load tracks if needed
-        content = div({ class: 'track-list' }, homeView.render())
-        break
-      case 'upload':
-        content = uploadView.render()
-        break
-      case 'record':
-        content = recordView.render()
-        break
-      case 'track-detail':
-        // TODO tracks should be global state?
-        let track = window.tracks.find(track => track.id === router.currentTrackId)
-        content = trackDetailView.render(track)
-        break
-      default:
-        content = div({ class: 'loading' }, 'Loading...')
-    }
-  } catch (err) {
-    console.error('Error rendering view:', err)
-    content = div({ class: 'error-message' }, `Failed to load ${currentView} view`)
+  switch(router.currentView) {
+    case 'home': 
+      // Load tracks if needed
+      content = div({ class: 'track-list' }, homeView.render())
+      break
+    case 'upload':
+      content = uploadView.render()
+      break
+    case 'record':
+      content = recordView.render()
+      break
+    case 'track-detail':
+      let track = appState.tracks.find(track => track.id === router.currentTrackId)
+      content = trackDetailView.render(track)
+      break
+    default:
+      content = div({ class: 'loading' }, 'Loading...')
   }
   
   return div({ class: 'app' },
@@ -80,6 +72,15 @@ window.renderPlayer = renderHelper(
   player.render.bind(player) // for now we bind the method to the instance
 )
 
+window.renderAudioButtons = renderHelper('.audio-control', element => {
+  // console.log('renderAudioButtons', element)
+  console.log({isPlaying: appState.player.isPlaying})
+  if (element.classList.contains('player-control')) {
+    return player.renderPlayButton(element).render()
+  } else {
+    return homeView.renderPlayButton(element).render()
+  }
+})
 
 // Simple hash-based routing
 const handleRouteChange = () => {
@@ -97,22 +98,12 @@ const handleRouteChange = () => {
 window.addEventListener('hashchange', handleRouteChange)
 window.addEventListener('popstate', handleRouteChange)
 
-// Main App Component
-// const App = (viewContent, currentView) =>
-//   div({ class: 'app' },
-//     header({ class: 'container header-content' },
-//       div({ class: 'logo' }, 'SoundClone v0'),
-//       Navigation(currentView)
-//     ),
-//     viewContent
-//   )
-
 const bootstrap = async () => {
 
-  if (!window.tracks || window.tracks.length === 0) {
+  if (!appState.tracks || appState.tracks.length === 0) {
     try {
-      window.tracks = await getTracks()
-      console.log('Tracks loaded from API:', window.tracks)
+      appState.tracks = await getTracks()
+      console.log('Tracks loaded from API:', appState.tracks)
     } catch (err) {
       console.error('Error loading tracks:', err)
       throw err

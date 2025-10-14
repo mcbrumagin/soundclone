@@ -109,10 +109,10 @@ async function getTrackDetail(payload, request) {
   }
 }
 
-// Upload track service
+// TODO need to support request obj?
 async function uploadTrack(payload, request) {
   try {
-    console.log('uploadTrack service called')
+    console.log('uploadTrack service called', request)
     const { files, fields } = await parseFileUpload(request)
     
     if (!files.audio) {
@@ -472,7 +472,7 @@ async function getHealth(payload, request) {
 // Static file and SPA routing service
 async function staticFileService(payload) {
   try {
-    console.log('Static file service called with:', payload)
+    // console.log('Static file service called with:', payload)
     const { url } = payload || {}
     
     if (!url) {
@@ -602,31 +602,16 @@ async function startServer() {
     await registryServer(PORT)
     console.log(`Registry server running on port ${PORT}`)
     
-    // Create services
-    // await Promise.all([
-    //   createService(getTrackList),
-    //   createService(getTrackDetail),
-    //   createService(uploadTrack),
-    //   createService(updateTrack),
-    //   createService(deleteTrack),
-    //   createService(createComment),
-    //   createService(updateComment),
-    //   createService(deleteComment),
-    //   createService(getAudioFile),
-    //   // createService(getHealth),
-    //   createService(staticFileService)
-    // ])
-    
     // Register routes for each service using function names
     await createRoutes({
-      'getTrackList': getTrackList,
-      'getTrackDetail': getTrackDetail,
-      'uploadTrack': uploadTrack,
-      'updateTrack': updateTrack,
-      'deleteTrack': deleteTrack,
-      'createComment': createComment,
-      'updateComment': updateComment,
-      'deleteComment': deleteComment,
+      '/getTrackList': getTrackList,
+      '/getTrackDetail': getTrackDetail,
+      '/uploadTrack': uploadTrack,
+      '/updateTrack': updateTrack,
+      '/deleteTrack': deleteTrack,
+      '/createComment': createComment,
+      '/updateComment': updateComment,
+      '/deleteComment': deleteComment,
       '/api/audio/*': getAudioFile,
       '/getHealth': getHealth,
       '/*': staticFileService,

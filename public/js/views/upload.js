@@ -28,14 +28,14 @@ export default class UploadView {
     }
     
     // Preview the audio if audio system is available
-    if (window.audioSystem && window.audioSystem.player) {
+    if (appState.player) {
       const fileURL = URL.createObjectURL(file)
       console.log('Created fileUrl:', fileURL)
       // For file preview, directly set the audio source instead of using loadTrack
       // since loadTrack expects a track with an id for API URL construction
-      window.audioSystem.player.audio.src = fileURL
-      window.audioSystem.player.audio.load()
-      window.audioSystem.player.currentTrack = {
+      appState.player.audio.src = fileURL
+      appState.player.audio.load()
+      appState.player.currentTrack = {
         title: titleFromFile,
         audioUrl: fileURL,
         isPreview: true
@@ -96,11 +96,10 @@ export default class UploadView {
   }
 
   reset() {
-    // Clean up preview object URL to prevent memory leaks
-    if (window.audioSystem && window.audioSystem.player && window.audioSystem.player.currentTrack?.isPreview) {
-      URL.revokeObjectURL(window.audioSystem.player.currentTrack.audioUrl)
-      window.audioSystem.player.audio.src = ''
-      window.audioSystem.player.currentTrack = null
+    if (appState.player.currentTrack?.isPreview) {
+      URL.revokeObjectURL(appState.player.currentTrack.audioUrl)
+      appState.player.audio.src = ''
+      appState.player.currentTrack = null
     }
     
     this.selectedFile = null

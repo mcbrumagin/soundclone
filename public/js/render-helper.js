@@ -5,7 +5,8 @@ const renderHelper = (selector, renderFn, renderNow = false) => {
   async function render(fnOrStr) {
     const elements = document.querySelectorAll(selector)
     for (const element of elements) {
-      element.innerHTML = (fnOrStr instanceof Function) ? fnOrStr() : fnOrStr
+      console.log({element})
+      element.innerHTML = (fnOrStr instanceof Function) ? fnOrStr(element) : fnOrStr
     }
   }
 

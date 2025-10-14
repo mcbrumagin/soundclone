@@ -1,7 +1,7 @@
 import { htmlTags } from 'micro-js-html'
 import { getTrack, updateTrack, deleteTrack, addComment, updateComment, deleteComment } from '../api.js'
 
-const { main, h1, div, i, input, textarea, button, a, h2, p } = htmlTags
+const { main, h1, div, span, i, input, textarea, button, a, h2, p } = htmlTags
 
 export default class TrackDetailView {
   constructor() {
@@ -107,53 +107,54 @@ export default class TrackDetailView {
     }
   }
 
-  handleTimestampClick(timeString) {
-    const match = timeString.match(/@(\d{2}):(\d{2})/)
-    if (match && window.audioSystem) {
+  handleTimestampClick(event) {
+    let element = event.target
+    let timestamp = element.dataset.timestamp
+    // console.log({timestamp})
+    const match = element.dataset.timestamp.match(/(\d{2}):(\d{2})/)
+    if (match) {
       const minutes = parseInt(match[1])
       const seconds = parseInt(match[2])
       const timeInSeconds = minutes * 60 + seconds
       
-      // Seek to timestamp and play
-      window.audioSystem.seekTo(timeInSeconds)
-      window.audioSystem.play()
-    }
-  }
-
-  setupEventListeners() {
-    const waveformSeeker = document.getElementById('waveformSeeker')
-    
-    if (waveformSeeker) {
-      waveformSeeker.addEventListener('input', (e) => {
-        if (window.audioSystem) {
-          const seekTime = parseFloat(e.target.value)
-          window.audioSystem.seekTo(seekTime)
-          this.updateWaveformProgress(seekTime, window.audioSystem.duration || 0)
-        }
-      })
+      appState.player.seekTo(timeInSeconds)
+      appState.player.play()
     }
   }
 
   renderComment(comment) {
     const formattedDate = new Date(comment.timestamp).toLocaleDateString()
     
-    // Format comment text to make timestamp tags clickable
+    const getTimestampReplacementString = () => span({
+      class: 'timestamp-tag',
+      "data-timestamp": "$1:$2",
+      onclick: this.handleTimestampClick
+    }, "@$1:$2" ).render()
+
     let commentText = comment.text
     if (comment.hasTimestamp) {
       const regex = /@(\d{2}):(\d{2})/g
-      commentText = commentText.replace(regex, '<span class="timestamp-tag">@$1:$2</span>')
+      commentText = commentText.replace(regex, getTimestampReplacementString())
     }
     
     return div({ class: 'comment', onclick: (e) => {
-      this.handleCommentClick(e)
+      // this.handleCommentClick(e)
     }},
       div({ class: 'comment-header' },
         div({ class: 'comment-date' }, formattedDate)
       ),
-      div({ class: 'comment-text', innerHTML: commentText }),
+      div({ class: 'comment-text' }, commentText),
       div({ class: 'comment-actions' },
-        button({ class: 'secondary edit-comment', 'data-comment-id': comment.id, onclick: (e) => this.handleCommentEdit(e) }, 'Edit'),
-        button({ class: 'secondary delete-comment', 'data-comment-id': comment.id, onclick: (e) => this.handleCommentDelete(e) }, 'Delete')
+        button({
+          class: 'secondary edit-comment',
+          'data-comment-id': comment.id,
+          onclick: (e) => this.handleCommentEdit(e)
+        }, 'Edit'),
+        button({
+          class: 'secondary delete-comment',
+          'data-comment-id': comment.id,
+          onclick: (e) => this.handleCommentDelete(e)
+        }, 'Delete')
       )
     )
   }
@@ -198,7 +199,12 @@ export default class TrackDetailView {
           class: 'waveform-seeker',
           min: '0',
           max: '100',
-          value: this.currentTime || '0'
+          value: this.currentTime || '0',
+          oninput: e => {
+            const seekTime = parseFloat(e.target.value)
+            appState.player.seekTo(seekTime)
+            this.updateWaveformProgress(seekTime, appState.player.currentTrack.duration || 0)
+          }
         })
       ),
       div({ class: 'comments-section' },

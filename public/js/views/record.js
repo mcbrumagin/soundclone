@@ -16,6 +16,18 @@ export default class RecordView {
     this.recordingTimer = null
   }
 
+  // TODO global helper?
+  getTrackLengthFromDisplayTime(displayTime) {
+    const match = displayTime.match(/(\d{2}):(\d{2})/)
+    if (match) {
+      const minutes = parseInt(match[1])
+      const seconds = parseInt(match[2])
+      const timeInSeconds = minutes * 60 + seconds
+      return timeInSeconds
+    } else return false
+  }
+
+
   async startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -41,10 +53,11 @@ export default class RecordView {
         console.log('Recording URL:', this.recordingUrl)
 
         // Load as current track for preview
-        if (window.audioSystem) {
-          window.player.loadTrack({
+        if (appState.player) {
+          appState.player.loadTrack({
             title: 'New Recording',
-            audioUrl: this.recordingUrl
+            audioUrl: this.recordingUrl,
+            duration: this.getTrackLengthFromDisplayTime(this.recordTime)
           }, false)
         }
         
@@ -235,8 +248,8 @@ export default class RecordView {
                 window.player.toggle()
               }
             },
-              i({ class: window.appState && window.appState.isPlaying ? 'fas fa-pause' : 'fas fa-play' }), 
-              window.appState && window.appState.isPlaying ? ' Pause' : ' Play'
+              i({ class: window.appState && appState.player.isPlaying ? 'fas fa-pause' : 'fas fa-play' }), 
+              window.appState && appState.player.isPlaying ? ' Pause' : ' Play'
             ),
             button({ 
               id: 'resetButton', 
@@ -267,14 +280,15 @@ export default class RecordView {
         ),
         div({ class: 'action-buttons' },
           button({
-            id: 'saveButton', 
-            disabled: !this.recordingUrl,
+            id: 'saveButton',
+            // TODO
+            // disabled: !this.recordingUrl,
             onclick: () => this.saveRecording()
           }, 'Save Recording'),
           button({
             class: 'secondary', 
             id: 'discardButton', 
-            disabled: !this.recordingUrl,
+            // disabled: !this.recordingUrl,
             onclick: () => this.discard()
           }, 'Discard')
         )

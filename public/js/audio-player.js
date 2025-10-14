@@ -4,64 +4,46 @@ const { div, input, button, span } = htmlTags
 class AudioPlayer {
   constructor() {
     this.audio = new Audio()
-    this.currentTrack = null
+    this.currentTrack = { id: 'N/A' }
     this.volume = 1
-    this.listeners = {}
     
     this.setupEventListeners()
   }
 
   loadTrack(track) {
+    if (!track) track = appState.tracks[0]
     console.log('loadTrack into player', track)
     this.currentTrack = track
-    // Construct the audio URL using the server's API endpoint
-    this.audio.src = `/api/audio/${track.id}`
-    console.log('Loading audio from:', this.audio.src)
+    this.audio.src = track?.audioUrl || `/api/audio/${track.id}`
     this.audio.load()
   }
 
   async play(trackId) {
-    if (!window.tracks.length === 0) {
+    if (!appState.tracks.length === 0) {
       console.warn('No tracks to play')
       return false
     }
 
-    let track
-    if (trackId && trackId !== appState.currentlyPlayingTrackId) {
-      // TODO appState instead of window
-      track = window.tracks.find(t => t.id === trackId)
-      trackId = track.id
-    }
+    let track = appState.tracks.find(t => t.id === trackId)
 
-    // default to the first track on the page
-    // might break in the future if appState holds all tracks even for playlist pages
-    if (!this.currentTrack) {
-      track = window.tracks[0]
-    }
+    // console.log({track, trackId, current: this.currentTrack})
 
-    this.loadTrack(track)
+    if (!this.currentTrack || track && this.currentTrack.id !== track.id) {
+      this.loadTrack(track)
+    }
+    
     await this.audio.play()
 
-    // TODO refactor to use single appState.currentTrack w/ data (name display is missing)
-    appState.isPlaying = true // redundant
-    appState.isPlaying = true
-    appState.currentlyPlayingTrackId = this.currentTrack.id
-
-    // TODO renderHelpers just for play status progress/buttons
-    window.renderApp()
-    window.renderPlayer()
     return true
   }
 
   pause() {
     this.audio.pause()
-    appState.isPlaying = false
-    window.renderApp()
-    window.renderPlayer(this.render())
+    window.renderAudioButtons()
   }
 
   toggle() {
-    return appState.isPlaying ? this.pause() : this.play()
+    return this.isPlaying ? this.pause() : this.play()
   }
 
   seek(time) {
@@ -72,44 +54,7 @@ class AudioPlayer {
     this.volume = Math.max(0, Math.min(1, volume))
     this.audio.volume = this.volume
   }
-
-  setupEventListeners() {
-    // TODO seems silly and redundant
-    this.audio.addEventListener('timeupdate', () => {
-      this.emit('timeupdate', {
-        currentTime: this.audio.currentTime,
-        duration: this.audio.duration
-      })
-    })
-
-    this.audio.addEventListener('ended', () => {
-      appState.isPlaying = false
-      window.renderApp()
-    })
-
-    // this.audio.addEventListener('loadedmetadata', () => {
-    //   this.emit('loaded', {
-    //     duration: this.audio.duration
-    //   })
-    // })
-
-    this.audio.addEventListener('error', (error) => {
-      console.error('Audio error:', error)
-      this.emit('error', error)
-    })
-  }
-
-  // Simple event emitter
-  emit(event, data) {
-    if (this.listeners[event]) {
-      this.listeners[event].forEach(callback => callback(data))
-    }
-  }
-
-  on(event, callback) {
-    if (!this.listeners[event]) this.listeners[event] = []
-    this.listeners[event].push(callback)
-  }
+  
 
   // UI update methods
   updateProgress({ currentTime }) {
@@ -128,16 +73,6 @@ class AudioPlayer {
       const total = this.formatTime(this.currentTrack.duration || 0)
       // console.log({total})
       timeDisplay.textContent = `${current} / ${total}`
-    }
-  }
-
-  updatePlayButton(isPlaying) {
-    const playButton = document.getElementById('playerPlayButton')
-    if (playButton) {
-      const icon = playButton.querySelector('span')
-      if (icon) {
-        icon.textContent = isPlaying ? '⏸' : '▶'
-      }
     }
   }
 
@@ -168,81 +103,71 @@ class AudioPlayer {
     }
   }
 
-  // Setup UI event listeners after render
-  setupUI(track) {
-    // if (!track) {
-    //   console.warn('no track')
-    //   return
-    // }
-    // Bind player events to update UI
-    this.on('timeupdate', (data) => {
-      
-      this.updateProgress(data)
-
-      // TODO need to clean up updateProgress/etc for stateful updates
-      // maybe use a renderHelper for the progress/time display
-      console.log('updating current track time', data.currentTime)
-      if (track) {
-        data.duration = track.duration
-        // console.log('timeupdate', data)
-        
-        // track.currentTime = data.currentTime
-        this.currentTrack.currentTime = data.currentTime
-        // this.audio.currentTime
-      }
+  setupEventListeners() {
+    this.audio.addEventListener('timeupdate', data => {
+      // console.log('timeupdate event', data)
+      let { currentTime, duration } = this.audio
+      this.updateProgress({ currentTime, duration })
     })
 
-    // TODO flashes 0:00?
-    // this.on('loaded', (data) => {
-    //   this.updateDuration(data.duration)
-    // })
-
-    this.on('play', () => {
-      this.updatePlayButton(true)
+    this.audio.addEventListener('loaded', data => {
+      console.log('loaded event', data)
+      // duration = this.audio.duration
+      // this.updateDuration(duration)
+      window.renderPlayer()
+      window.renderApp()
     })
 
-    this.on('pause', () => {
-      this.updatePlayButton(false)
+    this.audio.addEventListener('play', data => {
+      console.log('play event', data)
+      this.isPlaying = true
+      this.isPaused = true
+      window.renderAudioButtons()
+      // window.renderApp()
     })
 
-    this.on('ended', () => {
-      this.updatePlayButton(false)
+    this.audio.addEventListener('pause', data => {
+      console.log('pause event', data)
+      this.isPlaying = false
+      this.isPaused = true
+      window.renderAudioButtons()
+      // window.renderApp()
     })
 
-    this.on('error', (error) => {
-      console.error('Player UI error:', error)
-      this.updatePlayButton(false)
+    this.audio.addEventListener('ended', data => {
+      console.log('ended event', data)
+      // window.renderPlayer()
+      window.renderAudioButtons()
+    })
+
+    this.audio.addEventListener('error', error => {
+      console.error('error event', error)
+      // window.renderPlayer()
+      window.renderAudioButtons()
+      // TODO toast an error for playback
     })
   }
 
-  convertDurationToDisplay(duration) {
-    let minutes = Math.floor(duration / 60)
-    let seconds = Math.floor(duration % 60)
-    console.log('render convert', {minutes, seconds})
-    if (!isNaN(minutes) && !isNaN(seconds)) {
-      // if (minutes.toString().length === 1) seconds = '0' + minutes
-      if (seconds.toString().length === 1) seconds = '0' + seconds
-      return `${minutes}:${seconds}`
-    } else return '0:00'
+  renderPlayButton() {
+    return span({}, this.isPlaying ? '⏸' : '▶')
   }
 
   render(track) {
-    this.setupUI(track)
+    // init current track?
+    // this.setupEventListeners()
 
-    let duration = this.convertDurationToDisplay(this.currentTrack?.duration)
-    let currentTime = this.convertDurationToDisplay(this.audio?.currentTime || this.currentTrack?.currentTime)
-
-    console.log('render currentTime', currentTime)
-    console.log('render duration', duration)
+    let currentTime = this.formatTime(this.audio.currentTime)
+    let duration = this.formatTime(this.audio.duration)
+    console.log('render player', currentTime, duration)
 
     return div({ class: 'audio-player' },
       div({ class: 'player-controls' },
         button({ 
           id: 'playerPlayButton', 
-          class: 'play-button',
+          class: 'audio-control player-control play-button',
           onclick: () => this.toggle()
         }, 
-          span({}, appState.isPlaying ? '⏸' : '▶')
+          this.renderPlayButton()
         ),
         div({ class: 'progress-container' },
           input({ 
@@ -274,9 +199,7 @@ class AudioPlayer {
             max: '1', 
             step: '0.1', 
             value: '1',
-            oninput: (e) => {
-              this.setVolume(parseFloat(e.target.value))
-            }
+            oninput: (e) => this.setVolume(parseFloat(e.target.value))
           })
         )
       )

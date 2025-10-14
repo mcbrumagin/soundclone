@@ -1,6 +1,6 @@
 import { htmlTags } from 'micro-js-html'
 
-const { div, h2, button, a, header, i } = htmlTags
+const { div, h2, button, a, span, header, i } = htmlTags
 
 // Format seconds to mm:ss
 const formatTime = (seconds) => {
@@ -11,43 +11,48 @@ const formatTime = (seconds) => {
 }
 
 export default class HomeView {
-  constructor(player) {
-    this.player = player
+  constructor() {
+
   }
 
   togglePlayPause() {
-    if (this.player.isPlaying) {
-      player.pause()
+    if (appState.player.isPlaying) {
+      appState.player.pause()
     } else {
       // If no track is loaded, load the first available track
-      if (!player.currentTrack && window.tracks.length > 0) {
-        const firstTrack = window.tracks[0]
-        this.loadTrack(firstTrack, true) // autoplay = true
-      } else {
-        player.play()
+      if (!appState.player.currentTrack && appState.tracks.length > 0) {
+        const firstTrack = appState.tracks[0]
+        this.loadTrack(firstTrack, true)
       }
+      appState.player.play()
     }
   }
 
-  loadTrack(track, autoplay = false) {
-    this.player.loadTrack(track)
-    appState.currentlyPlayingTrackId = track.id || null
-    if (autoplay) {
-      player.play()
-    }
+  // loadTrack(track) {
+  //   appState.player.loadTrack(track)
+  // }
+
+  getTrackState(track) {
+    const { isPlaying, currentTrack } = appState.player
+    const isThisTrackPlaying = isPlaying && currentTrack.id === track.id
+    const isThisTrackPaused = !isPlaying && currentTrack.id === track.id
+    return { isThisTrackPlaying, isThisTrackPaused }
+  }
+
+  renderPlayButton(element) {
+    // element.data
+    let track = appState.tracks.find(t => t.id === (element.id || element?.dataset.trackId))
+    let { isPlaying, currentTrack } = appState.player
+    const isThisTrackPlaying = isPlaying && currentTrack.id === track.id
+    const isThisTrackPaused = !isPlaying && currentTrack.id === track.id
+    console.log({trackId: track.id, isThisTrackPlaying, isThisTrackPaused})
+    return span(
+      i({ class: isThisTrackPlaying ? 'fas fa-pause' : 'fas fa-play' }), 
+      isThisTrackPlaying ? ' Pause' : isThisTrackPaused ? 'Resume' : ' Play'
+    )
   }
 
   renderTrackCard(track) {
-    const { isPlaying, currentlyPlayingTrackId } = window.appState
-    const isThisTrackPlaying = isPlaying && currentlyPlayingTrackId === track.id
-    const isThisTrackPaused = !isPlaying && currentlyPlayingTrackId === track.id
-    
-    console.log('isThisTrackPlaying', isThisTrackPlaying)
-    console.log('track.id', track.id)
-    console.log({track})
-    console.log('isPlaying', isPlaying)
-    console.log('currentlyPlayingTrackId', currentlyPlayingTrackId)
-
     return div({ class: 'track-card' },
       div({ class: 'track-card-header' },
         h2({ class: 'track-title' }, track.title),
@@ -57,15 +62,15 @@ export default class HomeView {
       ),
       div({ class: 'track-actions' },
         button({ 
-          class: `play-track ${isThisTrackPlaying ? 'playing' : ''}`, 
+          class: `play-track audio-control`,
+          "data-track-id": track.id,
           onClick: () => {
-            if (isThisTrackPlaying) this.player.pause()
-            else this.player.play(track.id)
-            // else this.playTrackById(track.id)
+            let { isThisTrackPlaying } = this.getTrackState(track)
+            if (isThisTrackPlaying) appState.player.pause()
+            else appState.player.play(track.id)
           }
-        }, 
-          i({ class: isThisTrackPlaying ? 'fas fa-pause' : 'fas fa-play' }), 
-          isThisTrackPlaying ? ' Pause' : isThisTrackPaused ? 'Resume' : ' Play'
+        },
+          this.renderPlayButton(track)
         ),
         a({ 
           class: 'secondary view-track', 
@@ -78,12 +83,12 @@ export default class HomeView {
   }
 
   render() {
-    if (window.tracks.length === 0) {
+    if (appState.tracks.length === 0) {
       return div({ class: 'loading' }, 'Loading...')
     }
 
     return div({ class: 'track-list' }, 
-      ...window.tracks.map(track => this.renderTrackCard(track))
+      ...appState.tracks.map(track => this.renderTrackCard(track))
     )
   }
 }

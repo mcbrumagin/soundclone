@@ -41,7 +41,7 @@ const callServiceWithFiles = async (serviceName, formData) => {
   // For file uploads, we need to send the call structure differently
   // The registry expects a JSON payload with call.name and call.payload
   // But for file uploads, we need to handle this specially
-  const response = await fetch(SERVICE_REGISTRY_URL, {
+  const response = await fetch(`${SERVICE_REGISTRY_URL}${serviceName ? `/${serviceName}` : ''}`, {
     method: 'POST',
     body: formData // FormData will be handled directly by the service
   })
