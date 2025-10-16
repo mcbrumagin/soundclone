@@ -3,10 +3,10 @@
   "version": "0.0.1",
   "description": "SoundClone v0 - Minimal hybrid of SoundCloud and voice memo app",
   "type": "module",
-  "main": "server.js",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
   },
   "dependencies": {
     "micro-js": "^0.1.1",

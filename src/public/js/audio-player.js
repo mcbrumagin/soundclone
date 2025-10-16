@@ -20,7 +20,7 @@ class AudioPlayer {
 
     // TODO NEW (doesn't work)
     // this.audio.type = track?.fileType || 'audio/webm'
-    this.audio.src = `/api/audio/${track.fileName}`
+    this.audio.src = track.fileName ? `/api/audio/${track.fileName}` : track?.audioUrl
     console.log('NOTE',{track})
     this.audio.load()
   }
