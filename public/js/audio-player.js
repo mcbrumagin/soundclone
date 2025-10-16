@@ -14,7 +14,14 @@ class AudioPlayer {
     if (!track) track = appState.tracks[0]
     console.log('loadTrack into player', track)
     this.currentTrack = track
-    this.audio.src = track?.audioUrl || `/api/audio/${track.id}`
+
+    // TODO OLD
+    // this.audio.src = track?.audioUrl || `/api/audio/${track.fileName}`
+
+    // TODO NEW (doesn't work)
+    // this.audio.type = track?.fileType || 'audio/webm'
+    this.audio.src = `/api/audio/${track.fileName}`
+    console.log('NOTE',{track})
     this.audio.load()
   }
 

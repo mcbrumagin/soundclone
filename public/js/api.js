@@ -3,6 +3,7 @@ const SERVICE_REGISTRY_URL = window.location.origin
 
 // Helper function to call micro-js services
 const callService = async (serviceName, payload = {}) => {
+  console.log('callService', serviceName, payload)
   const response = await fetch(SERVICE_REGISTRY_URL, {
     method: 'POST',
     headers: {

@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url'
 // import { v4 as uuidv4 } from 'uuid'
 import crypto from 'node:crypto'
 
+import fileStreamService from './file-stream-service.js'
+
 overrideConsoleGlobally({
   includeLogLineNumbers: true
 })
@@ -30,6 +32,7 @@ const dataDir = path.join(__dirname, 'data')
 const uploadsDir = path.join(dataDir, 'uploads')
 const metadataDir = path.join(dataDir, 'metadata')
 
+// TODO helper fn for creating dirs
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir)
 }
@@ -40,21 +43,6 @@ if (!fs.existsSync(metadataDir)) {
   fs.mkdirSync(metadataDir)
 }
 
-// Helper function to read request body
-async function readRequestBody(request) {
-  return new Promise((resolve, reject) => {
-    let body = ''
-    request.on('data', chunk => {
-      body += chunk.toString()
-    })
-    request.on('end', () => {
-      resolve(body)
-    })
-    request.on('error', reject)
-  })
-}
-
-// Get tracks list service
 async function getTrackList(payload, request) {
   try {
     console.log('getTrackList service called')
@@ -78,7 +66,6 @@ async function getTrackList(payload, request) {
   }
 }
 
-// Get track detail service
 async function getTrackDetail(payload, request) {
   try {
     console.log('getTrackDetail service called')
@@ -163,7 +150,6 @@ async function uploadTrack(payload, request) {
   }
 }
 
-// Update track service
 async function updateTrack(payload, request) {
   try {
     console.log('updateTrack service called')
@@ -200,7 +186,6 @@ async function updateTrack(payload, request) {
   }
 }
 
-// Delete track service
 async function deleteTrack(payload, request) {
   try {
     console.log('deleteTrack service called')
@@ -238,7 +223,6 @@ async function deleteTrack(payload, request) {
   }
 }
 
-// Helper function to parse comment timestamp
 function parseCommentTimestamp(text) {
   const hasTimestamp = text.includes('@')
   let trackTimestamp = null
@@ -255,7 +239,6 @@ function parseCommentTimestamp(text) {
   return { hasTimestamp, trackTimestamp }
 }
 
-// Create comment service
 async function createComment(payload, request) {
   try {
     console.log('createComment service called')
@@ -309,7 +292,6 @@ async function createComment(payload, request) {
   }
 }
 
-// Update comment service
 async function updateComment(payload, request) {
   try {
     console.log('updateComment service called')
@@ -364,7 +346,6 @@ async function updateComment(payload, request) {
   }
 }
 
-// Delete comment service
 async function deleteComment(payload, request) {
   try {
     console.log('deleteComment service called')
@@ -407,49 +388,6 @@ async function deleteComment(payload, request) {
   }
 }
 
-// Get audio file service
-async function getAudioFile(payload, request) {
-  console.warn('getAudioFile service called', payload)
-  // const { trackId } = payload || {}
-  const trackId = payload.url.split('/').pop()
-  
-  if (!trackId) {
-    const error = new Error('Track ID is required')
-    error.status = 400
-    throw error
-  }
-  
-  const trackPath = path.join(metadataDir, `${trackId}.json`)
-  
-  if (!fs.existsSync(trackPath)) {
-    const error = new Error('Track not found')
-    error.status = 404
-    throw error
-  }
-  
-  const trackData = JSON.parse(fs.readFileSync(trackPath, 'utf8'))
-  const filePath = path.join(uploadsDir, trackData.fileName)
-  
-  if (!fs.existsSync(filePath)) {
-    const error = new Error('Audio file not found')
-    error.status = 404
-    throw error
-  }
-  
-  const fileData = fs.readFileSync(filePath)
-  
-  return {
-    status: 200,
-    headers: {
-      'Content-Type': trackData.fileType,
-      'Content-Disposition': `inline; filename="${trackData.fileName}"`
-    },
-    payload: fileData,
-    dataType: trackData.fileType
-  }
-}
-
-// Health check service
 async function getHealth(payload, request) {
   try {
     console.log('getHealth service called')
@@ -468,8 +406,7 @@ async function getHealth(payload, request) {
   }
 }
 
-
-// Static file and SPA routing service
+// TODO use micro-js builtin static file service
 async function staticFileService(payload) {
   try {
     // console.log('Static file service called with:', payload)
@@ -593,16 +530,13 @@ async function staticFileService(payload) {
   }
 }
 
-// Main server setup
 async function startServer() {
   try {
     console.log('Starting SoundClone v0 with micro-js...')
     
-    // Start registry server
     await registryServer(PORT)
     console.log(`Registry server running on port ${PORT}`)
     
-    // Register routes for each service using function names
     await createRoutes({
       '/getTrackList': getTrackList,
       '/getTrackDetail': getTrackDetail,
@@ -612,7 +546,7 @@ async function startServer() {
       '/createComment': createComment,
       '/updateComment': updateComment,
       '/deleteComment': deleteComment,
-      '/api/audio/*': getAudioFile,
+      '/api/audio/*': fileStreamService,
       '/getHealth': getHealth,
       '/*': staticFileService,
     })
