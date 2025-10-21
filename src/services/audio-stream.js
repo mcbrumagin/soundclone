@@ -34,6 +34,11 @@ export default async function audioStreamService(payload, request, response) {
     const contentType = getAudioContentType(audioFilePath)
     const stat = fs.statSync(audioFilePath)
     
+    // Check if file is empty
+    if (stat.size === 0) {
+      throw new HttpError(404, 'Audio file is empty or still being uploaded')
+    }
+    
     // Set response headers
     response.setHeader('Content-Type', contentType)
     response.setHeader('Content-Length', stat.size)
@@ -43,8 +48,17 @@ export default async function audioStreamService(payload, request, response) {
     const range = request.headers.range
     if (range) {
       const parts = range.replace(/bytes=/, '').split('-')
-      const start = parseInt(parts[0], 10)
-      const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1
+      const start = Math.max(0, parseInt(parts[0], 10) || 0)
+      const end = Math.min(stat.size - 1, parts[1] && parts[1].trim() !== '' ? parseInt(parts[1], 10) : stat.size - 1)
+      
+      // Validate range
+      if (start >= stat.size || end >= stat.size || start > end) {
+        response.statusCode = 416 // Range Not Satisfiable
+        response.setHeader('Content-Range', `bytes */${stat.size}`)
+        response.end()
+        return next({ reason: 'invalid range', start, end, fileSize: stat.size })
+      }
+      
       const chunkSize = (end - start) + 1
       
       response.statusCode = 206

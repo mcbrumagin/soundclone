@@ -1,6 +1,8 @@
 import { 
   registryServer, 
   createRoutes,
+  createService,
+  callService,
   overrideConsoleGlobally,
   HttpError
 } from 'micro-js'
@@ -12,7 +14,7 @@ import { ensureDataDirectories } from './lib/utils.js'
 // Import all services
 import getTrackList from './services/track-list.js'
 import getTrackDetail from './services/track-detail.js'
-import uploadTrack from './services/track-upload.js'
+import createTrackUploadService from './services/track-upload-service.js'
 import updateTrack from './services/track-update.js'
 import deleteTrack from './services/track-delete.js'
 import createComment from './services/comment-create.js'
@@ -46,6 +48,7 @@ async function startServer() {
     
     let staticFileService = await createStaticFileService({
       rootDir: publicDir,
+      urlRoot: '/',
       fileMap: {
         '/': 'index.html',
         '/css/*': 'css/*',
@@ -54,12 +57,13 @@ async function startServer() {
         '/js/views/*': 'js/views/*',
         '/js/components/*': 'js/components/*'
       }
-    }, async (url) => {
+    }, async (url, setContentType) => {
       // Custom resolver for micro-js-html modules
       if (url.startsWith('/micro-js-html/')) {
         const modulePath = path.join(nodeModulesDir, url)
         const fs = await import('node:fs')
         if (fs.existsSync(modulePath)) {
+          setContentType('text/javascript')
           return fs.readFileSync(modulePath, 'utf-8')
         }
       }
@@ -67,11 +71,14 @@ async function startServer() {
       return new HttpError(404, 'File not found')
     })
     
+    // Create track upload service
+    const trackUploadService = await createTrackUploadService()
+    
     // Register all API routes
     let services = await createRoutes({
       '/getTrackList': getTrackList,
       '/getTrackDetail': getTrackDetail,
-      '/uploadTrack': uploadTrack,
+      '/uploadTrack': 'file-upload-service', // Use the micro-js file upload service
       '/updateTrack': updateTrack,
       '/deleteTrack': deleteTrack,
       '/createComment': createComment,

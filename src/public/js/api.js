@@ -1,20 +1,51 @@
 // Service registry endpoint
 const SERVICE_REGISTRY_URL = window.location.origin
 
+// TODO add to micro-js-html?
 // Helper function to call micro-js services
+// const callService = async (serviceName, payload = {}) => {
+//   console.log('callService', serviceName, payload)
+//   const response = await fetch(SERVICE_REGISTRY_URL, {
+//     method: 'POST',
+//     headers: {
+//       'Content-Type': 'application/json'
+//     },
+//     body: JSON.stringify({
+//       call: {
+//         name: serviceName,
+//         payload: payload
+//       }
+//     })
+//   })
+  
+//   if (!response.ok) {
+//     throw new Error(`Service call failed: ${response.status} ${response.statusText}`)
+//   }
+  
+//   // Handle different content types
+//   const contentType = response.headers.get('content-type')
+//   if (contentType && contentType.includes('application/json')) {
+//     const json = await response.json()
+//     if (!json.success && json.message) {
+//       throw new Error(json.message)
+//     }
+//     return json
+//   } else {
+//     // For binary data like audio files
+//     return response
+//   }
+// }
+
 const callService = async (serviceName, payload = {}) => {
   console.log('callService', serviceName, payload)
   const response = await fetch(SERVICE_REGISTRY_URL, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'micro-command': 'service-call',
+      'micro-service-name': serviceName
     },
-    body: JSON.stringify({
-      call: {
-        name: serviceName,
-        payload: payload
-      }
-    })
+    body: JSON.stringify(payload)
   })
   
   if (!response.ok) {
@@ -37,27 +68,6 @@ const callService = async (serviceName, payload = {}) => {
 
 window.callService = callService
 
-// Helper for file uploads using FormData
-const callServiceWithFiles = async (serviceName, formData) => {
-  // For file uploads, we need to send the call structure differently
-  // The registry expects a JSON payload with call.name and call.payload
-  // But for file uploads, we need to handle this specially
-  const response = await fetch(`${SERVICE_REGISTRY_URL}${serviceName ? `/${serviceName}` : ''}`, {
-    method: 'POST',
-    body: formData // FormData will be handled directly by the service
-  })
-  
-  if (!response.ok) {
-    throw new Error(`Service call failed: ${response.status} ${response.statusText}`)
-  }
-  
-  const json = await response.json()
-  if (!json.success && json.message) {
-    throw new Error(json.message)
-  }
-  return json
-}
-
 // Track operations
 export const getTracks = async () => {
   const json = await callService('getTrackList')
@@ -69,9 +79,62 @@ export const getTrack = async trackId => {
   return json.track
 }
 
-export const uploadTrack = async formData => {
-  const json = await callServiceWithFiles('uploadTrack', formData)
-  return json.track
+// Audio upload using multipart form data
+export const uploadTrack = async (audioFile, title, description, onProgress = null) => {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData()
+    
+    // Add text fields first (convention: file should be last)
+    formData.append('title', title)
+    if (description) {
+      formData.append('description', description)
+    }
+    
+    // Add file last (per convention)
+    const filename = audioFile.name || 'recording.webm'
+    formData.append('audio', audioFile, filename)
+    
+    const xhr = new XMLHttpRequest()
+    
+    // Set up progress tracking if callback provided
+    if (onProgress) {
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100
+          onProgress(percentComplete, event.loaded, event.total)
+        }
+      })
+    }
+    
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText)
+          if (response.success) {
+            resolve(response.track)
+          } else {
+            reject(new Error(response.error || 'Upload failed'))
+          }
+        } catch (error) {
+          reject(new Error('Invalid response from server'))
+        }
+      } else {
+        reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`))
+      }
+    })
+    
+    xhr.addEventListener('error', () => {
+      reject(new Error('Network error during upload'))
+    })
+    
+    xhr.addEventListener('abort', () => {
+      reject(new Error('Upload was aborted'))
+    })
+    
+    // Send to the upload route
+    xhr.open('POST', `${SERVICE_REGISTRY_URL}/uploadTrack`)
+    xhr.send(formData)
+  })
 }
 
 export const updateTrack = async (trackId, data) => {

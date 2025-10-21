@@ -1,0 +1,15 @@
+{
+  "id": "7d8bc4d5-11d2-473c-9074-27e4d9595250",
+  "title": "test-upload-0",
+  "description": "",
+  "fileName": "test-upload-0-edb417e2.wav",
+  "fileType": "audio/x-wav",
+  "fileSize": 9098142,
+  "duration": 60,
+  "audioUrl": "/api/audio/7d8bc4d5-11d2-473c-9074-27e4d9595250",
+  "createdAt": "2025-10-21T10:16:39.248Z",
+  "updatedAt": "2025-10-21T10:16:39.248Z",
+  "shareableLink": "7d8bc4d5-11d2-473c-9074-27e4d9595250",
+  "comments": [],
+  "uploadPending": false
+}

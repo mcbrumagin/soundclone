@@ -1,5 +1,5 @@
 import { htmlTags } from 'micro-js-html'
-import { uploadTrack } from '../api.js'
+import { uploadTrack, getTracks } from '../api.js'
 
 const { main, h1, div, i, p, input, label, textarea, button, span, a } = htmlTags
 
@@ -63,29 +63,28 @@ export default class UploadView {
     
     const description = descriptionInput?.value.trim()
     
-    // Create form data for upload
-    const formData = new FormData()
-    formData.append('audio', this.selectedFile)
-    formData.append('title', title)
-    
-    if (description) {
-      formData.append('description', description)
-    }
-    
     this.uploading = true
     window.renderApp()
     
     try {
-      const track = await uploadTrack(formData)
+      // Use multipart upload with progress tracking
+      const track = await uploadTrack(this.selectedFile, title, description, (percent, loaded, total) => {
+        console.log(`Upload progress: ${percent.toFixed(1)}%`)
+        // TODO: Update UI with progress bar
+      })
       console.log('Track uploaded successfully:', track)
       
       // Reset form
       this.reset()
       
+      // Refresh tracks list
+      window.tracks = await getTracks()
+      
       alert('Track uploaded successfully!')
       
-      // Navigate back to home
+      // Navigate back to home and re-render
       window.location.hash = '#home'
+      window.renderApp()
     } catch (error) {
       console.error('Error uploading track:', error)
       alert('Failed to upload track. Please try again.')
@@ -191,7 +190,8 @@ export default class UploadView {
         ),
         button({ 
           id: 'uploadButton',
-          disabled: !this.selectedFile || this.uploading,
+          // TODO
+          // disabled: console.log(`selected file: ${this.selectedFile}`) && !this.selectedFile || this.uploading,
           onclick: () => this.handleUpload()
         }, this.uploading ? 'Uploading...' : 'Upload')
       )

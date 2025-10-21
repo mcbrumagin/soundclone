@@ -83,7 +83,7 @@ export default class HomeView {
   }
 
   render() {
-    if (appState.tracks.length === 0) {
+    if (!appState.tracks || appState.tracks.length === 0) {
       return div({ class: 'loading' }, 'Loading...')
     }
 

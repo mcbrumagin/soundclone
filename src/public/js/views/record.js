@@ -1,5 +1,5 @@
 import { htmlTags } from 'micro-js-html'
-import { uploadTrack } from '../api.js'
+import { uploadTrack, getTracks } from '../api.js'
 
 const { main, h1, div, i, input, label, textarea, button, a } = htmlTags
 
@@ -185,26 +185,25 @@ export default class RecordView {
     
     const description = descriptionInput?.value.trim()
     
-    // Create form data for upload
-    const formData = new FormData()
-    formData.append('audio', this.recordingBlob, 'recording.webm')
-    formData.append('title', title)
-    
-    if (description) {
-      formData.append('description', description)
-    }
-    
     try {
-      const track = await uploadTrack(formData)
+      // Use multipart upload with progress tracking
+      const track = await uploadTrack(this.recordingBlob, title, description, (percent, loaded, total) => {
+        console.log(`Upload progress: ${percent.toFixed(1)}%`)
+        // TODO: Update UI with progress
+      })
       console.log('Recording saved successfully:', track)
       
       // Reset recording state
       this.reset()
       
+      // Refresh tracks list
+      window.tracks = await getTracks()
+      
       alert('Recording saved successfully!')
       
-      // Navigate back to home
+      // Navigate back to home and re-render
       window.location.hash = '#home'
+      window.renderApp()
     } catch (error) {
       console.error('Error saving recording:', error)
       alert('Failed to save recording. Please try again.')

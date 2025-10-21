@@ -9,7 +9,7 @@
     "dev": "node src/server.js"
   },
   "dependencies": {
-    "micro-js": "^0.1.1",
+    "micro-js": "^0.2.1",
     "micro-js-html": "^0.0.5"
   }
 }
