@@ -1,0 +1,65 @@
+name: Deploy to AWS ECS
+
+on:
+  push:
+    branches: [ main, dev ]
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Determine environment from branch
+      id: env
+      run: |
+        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          echo "environment=prod" >> $GITHUB_OUTPUT
+          echo "image_tag=latest" >> $GITHUB_OUTPUT
+          echo "workspace=prod" >> $GITHUB_OUTPUT
+          echo "cluster_name=portfolio-prod-cluster" >> $GITHUB_OUTPUT
+          echo "service_name=portfolio-prod-service" >> $GITHUB_OUTPUT
+        else
+          echo "environment=dev" >> $GITHUB_OUTPUT
+          echo "image_tag=dev-latest" >> $GITHUB_OUTPUT
+          echo "workspace=dev" >> $GITHUB_OUTPUT
+          echo "cluster_name=portfolio-dev-cluster" >> $GITHUB_OUTPUT
+          echo "service_name=portfolio-dev-service" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Build and push Docker image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: soundclone-app
+        IMAGE_TAG: ${{ steps.env.outputs.image_tag }}
+        ENVIRONMENT: ${{ steps.env.outputs.environment }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    # - name: Force new deployment
+    #   env:
+    #     CLUSTER_NAME: ${{ steps.env.outputs.cluster_name }}
+    #     SERVICE_NAME: ${{ steps.env.outputs.service_name }}
+    #     ENVIRONMENT: ${{ steps.env.outputs.environment }}
+    #   run: |
+    #     echo "Deploying to $ENVIRONMENT environment"
+    #     echo "Cluster: $CLUSTER_NAME"
+    #     echo "Service: $SERVICE_NAME"
+    #     aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --force-new-deployment
