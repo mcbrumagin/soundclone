@@ -149,7 +149,7 @@ export default class UploadView {
             type: 'file', 
             id: 'fileInput', 
             class: 'file-input', 
-            accept: 'audio/mp3,audio/wav,audio/webm',
+            accept: 'audio/*',
             onchange: (e) => {
               if (e.target.files.length) {
                 this.handleFileSelect(e.target.files[0])

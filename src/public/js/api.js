@@ -133,6 +133,7 @@ export const uploadTrack = async (audioFile, title, description, onProgress = nu
     
     // Send to the upload route
     xhr.open('POST', `${SERVICE_REGISTRY_URL}/uploadTrack`)
+    xhr.setRequestHeader('micro-auth-token', appState.accessToken)
     xhr.send(formData)
   })
 }

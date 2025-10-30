@@ -41,7 +41,7 @@ export default class HomeView {
 
   renderPlayButton(element) {
     // element.data
-    let track = appState.tracks.find(t => t.id === (element.id || element?.dataset.trackId))
+    let track = appState.tracks.find(t => t.id === (element.id || element?.dataset?.trackId))
     let { isPlaying, currentTrack } = appState.player
     const isThisTrackPlaying = isPlaying && currentTrack.id === track.id
     const isThisTrackPaused = !isPlaying && currentTrack.id === track.id
@@ -84,7 +84,7 @@ export default class HomeView {
 
   render() {
     if (!appState.tracks || appState.tracks.length === 0) {
-      return div({ class: 'loading' }, 'Loading...')
+      return div({ class: 'loading' }, 'No tracks found')
     }
 
     return div({ class: 'track-list' }, 

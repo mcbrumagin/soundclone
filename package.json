@@ -9,7 +9,9 @@
     "dev": "node src/server.js"
   },
   "dependencies": {
-    "micro-js": "^0.2.1",
-    "micro-js-html": "^0.0.5"
+    "busboy": "^1.6.0",
+    "micro-js": "^0.2.6",
+    "micro-js-html": "^0.0.5",
+    "music-metadata": "^11.9.0"
   }
 }

@@ -2,9 +2,16 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { metadataDir } from '../lib/utils.js'
 
-export default async function getTrackList(payload, request) {
+export default async function getTrackList(payload, request, response) {
   try {
     console.log('getTrackList service called')
+    let remoteIp = request.socket.remoteAddress
+    let senderIp = request.headers['x-forwarded-for']
+    console.log('remote and sender ip:', remoteIp, senderIp)
+    console.log('request headers:', request.headers)
+    response.setHeader('forwarded', request.headers.forwarded)
+    response.setHeader('Cache-Control', 'max-age=60, public')
+    response.setHeader('x-test-header', 'test value')
     const files = fs.readdirSync(metadataDir)
     const tracks = []
     

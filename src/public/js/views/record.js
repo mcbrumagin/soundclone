@@ -30,9 +30,19 @@ export default class RecordView {
 
   async startRecording() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+
+      let mimeType = null
+
+      if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4'
+      else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg'
+      else if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm'
+      else throw new Error('Audio/MP4 or Audio/WebM is not supported on this browser')
+
+      console.log('mimeType selected:', mimeType)
+
+      this.mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType })
       
-      this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
       
       this.mediaRecorder.ondataavailable = (e) => {
         console.log('Recording data available')
@@ -42,7 +52,7 @@ export default class RecordView {
       this.mediaRecorder.onstop = () => {
         console.log('Recording stopped')
         // Create blob from chunks
-        this.recordingBlob = new Blob(this.audioChunks, { type: 'audio/webm;codecs=opus' })
+        this.recordingBlob = new Blob(this.audioChunks, { type: mimeType })
         
         // Create URL for the blob
         if (this.recordingUrl) {

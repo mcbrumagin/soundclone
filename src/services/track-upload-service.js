@@ -34,110 +34,116 @@ function normalizeFileName(originalName, formData) {
   return `${finalName}-${token}${ext}`
 }
 
-/**
- * Update track metadata after successful upload
- * @param {Object} uploadData - Upload success data
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
-async function onUploadSuccess(uploadData, req, res) {
-  try {
-    const { file, fields } = uploadData
-    const { title, description } = fields
-    
-    if (!title) {
-      throw new Error('Title is required')
-    }
-    
-    // Create track metadata
-    const trackId = crypto.randomUUID()
-    const trackData = {
-      id: trackId,
-      title,
-      description: description || '',
-      fileName: file.savedName,
-      fileType: file.mimeType,
-      fileSize: file.size,
-      duration: 60, // TODO: Extract from audio file
-      audioUrl: `/api/audio/${trackId}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      shareableLink: trackId,
-      comments: [],
-      uploadPending: false
-    }
-    
-    // Save metadata
-    const metadataPath = path.join(metadataDir, `${trackId}.json`)
-    fs.writeFileSync(metadataPath, JSON.stringify(trackData, null, 2))
-    
-    console.log(`Track uploaded successfully: ${trackData.title} (${trackId})`)
-    
-    // Send success response
-    const response = {
-      success: true,
-      message: 'Track uploaded successfully',
-      track: trackData,
-      file: {
-        originalName: file.originalName,
-        savedName: file.savedName,
-        size: file.size,
-        mimeType: file.mimeType
-      }
-    }
-    
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify(response))
-    
-  } catch (error) {
-    console.error('Error in upload success handler:', error)
-    
-    // Clean up uploaded file on metadata creation failure
-    try {
-      if (uploadData.file && uploadData.file.path) {
-        fs.unlinkSync(uploadData.file.path)
-        console.log('Cleaned up uploaded file after metadata error')
-      }
-    } catch (cleanupError) {
-      console.error('Failed to cleanup file:', cleanupError)
-    }
-    
-    const errorResponse = {
-      success: false,
-      error: 'Failed to create track metadata',
-      details: error.message
-    }
-    
-    res.writeHead(500, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify(errorResponse))
-  }
-}
-
-/**
- * Handle upload errors
- * @param {Object} errorData - Error data
- * @param {Error} error - Original error
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
-function onUploadError(errorData, error, req, res) {
-  console.error('Upload error:', errorData, error)
-  
-  const response = {
-    success: false,
-    error: errorData.error || 'Upload failed',
-    details: errorData.details || error?.message
-  }
-  
-  res.writeHead(400, { 'Content-Type': 'application/json' })
-  res.end(JSON.stringify(response))
-}
 
 /**
  * Create and configure the track upload service
  * @returns {Promise<Service>} The configured upload service
  */
-export default async function createTrackUploadService() {
+export default async function createTrackUploadService({ useAuthService, pubsubService }) {
+
+  /**
+   * Update track metadata after successful upload
+   * @param {Object} uploadData - Upload success data
+   * @param {Object} req - Request object
+   * @param {Object} res - Response object
+   */
+  async function onUploadSuccess(uploadData, req, res) {
+    try {
+      const { file, fields } = uploadData
+      const { title, description } = fields
+      
+      if (!title) {
+        throw new Error('Title is required')
+      }
+      
+      // Create track metadata
+      const trackId = crypto.randomUUID()
+      const trackData = {
+        id: trackId,
+        title,
+        description: description || '',
+        fileName: file.savedName,
+        fileType: file.mimeType,
+        fileSize: file.size,
+        duration: 60, // TODO: Extract from audio file
+        audioUrl: `/api/audio/${trackId}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        shareableLink: trackId,
+        comments: [],
+        uploadPending: false
+      }
+      
+      // Save metadata
+      const metadataPath = path.join(metadataDir, `${trackId}.json`)
+      fs.writeFileSync(metadataPath, JSON.stringify(trackData, null, 2))
+      
+      console.log(`Track uploaded successfully: ${trackData.title} (${trackId})`)
+      
+      // Send success response
+      const response = {
+        success: true,
+        message: 'Track uploaded successfully',
+        track: trackData,
+        file: {
+          originalName: file.originalName,
+          savedName: file.savedName,
+          size: file.size,
+          mimeType: file.mimeType
+        }
+      }
+      
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(response))
+      
+      // publish message to process additional music metadata asynchronously
+      await pubsubService.publish('processMusicMetadata', { fileName: file.savedName })
+      
+    } catch (error) {
+      console.error('Error in upload success handler:', error)
+      
+      // Clean up uploaded file on metadata creation failure
+      try {
+        if (uploadData.file && uploadData.file.path) {
+          fs.unlinkSync(uploadData.file.path)
+          console.log('Cleaned up uploaded file after metadata error')
+        }
+      } catch (cleanupError) {
+        console.error('Failed to cleanup file:', cleanupError)
+      }
+      
+      const errorResponse = {
+        success: false,
+        error: 'Failed to create track metadata',
+        details: error.message
+      }
+      
+      res.writeHead(500, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(errorResponse))
+    }
+  }
+
+
+  /**
+   * Handle upload errors
+   * @param {Object} errorData - Error data
+   * @param {Error} error - Original error
+   * @param {Object} req - Request object
+   * @param {Object} res - Response object
+   */
+  function onUploadError(errorData, error, req, res) {
+    console.error('Upload error:', errorData, error)
+    
+    const response = {
+      success: false,
+      error: errorData.error || 'Upload failed',
+      details: errorData.details || error?.message
+    }
+    
+    res.writeHead(400, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(response))
+  }
+
   return await createFileUploadService({
     uploadDir: uploadsDir,
     fileFieldName: 'audio', // Expect file field to be named 'audio'
@@ -145,6 +151,7 @@ export default async function createTrackUploadService() {
     getFileName: normalizeFileName,
     validateFile: validators.mimeType(['audio/*']), // Accept any audio type
     onSuccess: onUploadSuccess,
-    onError: onUploadError
+    onError: onUploadError,
+    useAuthService
   })
 }

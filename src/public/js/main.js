@@ -3,6 +3,7 @@ import renderHelper from './render-helper.js'
 // Removed router import - using simple hashchange handler
 import Navigation from './components/navigation.js'
 import HomeView from './views/home.js'
+import LoginView from './views/login.js'
 import UploadView from './views/upload.js'
 import RecordView from './views/record.js'
 import TrackDetailView from './views/track-detail.js'
@@ -15,6 +16,7 @@ const player = new AudioPlayer()
 
 // View instances
 const homeView = new HomeView(player)
+const loginView = new LoginView(player)
 
 // TODO implement player in all views
 const uploadView = new UploadView(player)
@@ -40,6 +42,9 @@ const App = () => {
     case 'home': 
       // Load tracks if needed
       content = div({ class: 'track-list' }, homeView.render())
+      break
+    case 'login':
+      content = loginView.render()
       break
     case 'upload':
       content = uploadView.render()
@@ -99,6 +104,26 @@ window.addEventListener('hashchange', handleRouteChange)
 window.addEventListener('popstate', handleRouteChange)
 
 const bootstrap = async () => {
+
+  // TODO helper fn to reuse wherever access token is needed (if the initial auth fails)
+  try  {
+    // check for refresh token and see if we can update the access token
+    let authResult = await fetch('/', {
+      method: 'POST',
+      body: null,
+      headers: {
+        'micro-command': 'auth-refresh'
+      }
+    })
+
+    if (authResult.ok) {
+      appState.accessToken = (await authResult.json()).accessToken
+      renderApp()
+    } else console.error('Error refreshing access token:', authResult)
+
+  } catch (err) {
+    console.error('Error refreshing access token:', err)
+  }
 
   if (!appState.tracks || appState.tracks.length === 0) {
     try {

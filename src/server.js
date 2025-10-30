@@ -6,6 +6,10 @@ import {
   overrideConsoleGlobally,
   HttpError
 } from 'micro-js'
+
+import createPubsubService from 'micro-js/pubsub-service'
+import initializeMusicMetadataProcessor from './services/music-meta.js'
+import createAuthService from 'micro-js/auth-service'
 import createStaticFileService from 'micro-js/static-file-service'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -42,43 +46,24 @@ async function startServer() {
     let registry = await registryServer()
     console.log(`Registry server running on port ${PORT}`)
     
-    // Create static file service for serving public files
     const publicDir = path.join(__dirname, 'public')
-    const nodeModulesDir = path.join(process.cwd(), 'node_modules')
     
-    let staticFileService = await createStaticFileService({
-      rootDir: publicDir,
-      urlRoot: '/',
-      fileMap: {
-        '/': 'index.html',
-        '/css/*': 'css/*',
-        '/js/*': 'js/*',
-        // TODO should discover these dynamically
-        '/js/views/*': 'js/views/*',
-        '/js/components/*': 'js/components/*'
-      }
-    }, async (url, setContentType) => {
-      // Custom resolver for micro-js-html modules
-      if (url.startsWith('/micro-js-html/')) {
-        const modulePath = path.join(nodeModulesDir, url)
-        const fs = await import('node:fs')
-        if (fs.existsSync(modulePath)) {
-          setContentType('text/javascript')
-          return fs.readFileSync(modulePath, 'utf-8')
-        }
-      }
-      
-      return new HttpError(404, 'File not found')
+    let authService = await createAuthService()
+    let pubsubService = await createPubsubService()    
+    const trackUploadService = await createTrackUploadService({
+      useAuthService: authService,
+      pubsubService
     })
+
+    console.log('trackUploadService', trackUploadService.name)
     
-    // Create track upload service
-    const trackUploadService = await createTrackUploadService()
-    
+    await initializeMusicMetadataProcessor(pubsubService)
+
     // Register all API routes
     let services = await createRoutes({
       '/getTrackList': getTrackList,
       '/getTrackDetail': getTrackDetail,
-      '/uploadTrack': 'file-upload-service', // Use the micro-js file upload service
+      '/uploadTrack': trackUploadService,
       '/updateTrack': updateTrack,
       '/deleteTrack': deleteTrack,
       '/createComment': createComment,
@@ -86,7 +71,17 @@ async function startServer() {
       '/deleteComment': deleteComment,
       '/api/audio/*': audioStreamService,
       '/getHealth': getHealth,
-      '/*': 'static-file-service',
+      '/*': await createStaticFileService({
+        rootDir: publicDir,
+        urlRoot: '/',
+        fileMap: {
+          '/': 'index.html',
+          '/css/*': 'css',
+          '/js/*': 'js',
+          '/assets/*': 'assets',
+          '/micro-js-html/*': '../../node_modules/micro-js-html/src'
+        }
+      })
     })
     
     console.log(`SoundClone v0 server running on http://localhost:${PORT}`)
@@ -100,7 +95,6 @@ async function startServer() {
       isTerminating = true
 
       console.log(`${signal} received, terminating server...`)
-      await staticFileService.terminate()
       await Promise.all(services.map(service => service?.terminate()))
       await registry.terminate()
       console.log('Server terminated')
