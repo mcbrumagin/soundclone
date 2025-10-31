@@ -53,14 +53,14 @@ jobs:
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-    # - name: Force new deployment
-    #   env:
-    #     CLUSTER_NAME: ${{ steps.env.outputs.cluster_name }}
-    #     SERVICE_NAME: ${{ steps.env.outputs.service_name }}
-    #     ENVIRONMENT: ${{ steps.env.outputs.environment }}
-    #   run: |
-    #     echo "Deploying to $ENVIRONMENT environment"
-    #     echo "Cluster: $CLUSTER_NAME"
-    #     echo "Service: $SERVICE_NAME"
-    #     aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --force-new-deployment
+    - name: Force new deployment
+      env:
+        CLUSTER_NAME: ${{ steps.env.outputs.cluster_name }}
+        SERVICE_NAME: ${{ steps.env.outputs.service_name }}
+        ENVIRONMENT: ${{ steps.env.outputs.environment }}
+      run: |
+        echo "Deploying to $ENVIRONMENT environment"
+        echo "Cluster: $CLUSTER_NAME"
+        echo "Service: $SERVICE_NAME"
+        aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --force-new-deployment
 
