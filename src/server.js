@@ -61,7 +61,7 @@ async function startServer() {
 
     // Register all API routes
     let services = await createRoutes({
-      '/health': () => 'OK',
+      '/health': function health() { return 'OK' },
       '/getTrackList': getTrackList,
       '/getTrackDetail': getTrackDetail,
       '/uploadTrack': trackUploadService,
