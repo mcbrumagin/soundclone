@@ -177,6 +177,12 @@ export const getAudioUrl = trackId => {
   return `${SERVICE_REGISTRY_URL}/service/getAudioFile`
 }
 
+// Audio metadata
+export const getAudioMetadata = async (fileName) => {
+  const json = await callService('getAudioMetadata', { fileName })
+  return json
+}
+
 // Health check
 export const getHealth = async () => {
   const json = await callService('getHealth')

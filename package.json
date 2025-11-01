@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "busboy": "^1.6.0",
-    "micro-js": "^0.2.6",
+    "micro-js": "file:../micro-js",
     "micro-js-html": "^0.0.5",
     "music-metadata": "^11.9.0"
   }

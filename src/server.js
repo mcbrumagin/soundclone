@@ -25,6 +25,7 @@ import createComment from './services/comment-create.js'
 import updateComment from './services/comment-update.js'
 import deleteComment from './services/comment-delete.js'
 import audioStreamService from './services/audio-stream.js'
+import audioMetadataService from './services/audio-metadata.js'
 import getHealth from './services/health.js'
 
 overrideConsoleGlobally({
@@ -59,9 +60,12 @@ async function startServer() {
     
     await initializeMusicMetadataProcessor(pubsubService)
 
-    // Register all API routes
+
+    // Register all API routes - order matters! More specific routes first
+    console.log('🔧 Registering routes...')
     let services = await createRoutes({
       '/health': function health() { return 'OK' },
+      '/api/audio/*': audioStreamService,  // Must be before static file service
       '/getTrackList': getTrackList,
       '/getTrackDetail': getTrackDetail,
       '/uploadTrack': trackUploadService,
@@ -70,7 +74,7 @@ async function startServer() {
       '/createComment': createComment,
       '/updateComment': updateComment,
       '/deleteComment': deleteComment,
-      '/api/audio/*': audioStreamService,
+      '/getAudioMetadata': audioMetadataService,
       '/getHealth': getHealth,
       '/*': await createStaticFileService({
         rootDir: publicDir,
@@ -85,8 +89,11 @@ async function startServer() {
       })
     })
     
+    console.log('🔧 Routes registered successfully')
+    console.log('🔧 Registered services:', Object.keys(services))
     console.log(`SoundClone v0 server running on http://localhost:${PORT}`)
     console.log(`API health check: http://localhost:${PORT}/api/health`)
+    console.log(`🎵 Audio streaming: http://localhost:${PORT}/api/audio/test-track.wav`)
 
     // TODO shutdown helper in registry that calls terminate on all services then kills itself
     // services will need to be aware of any same host neighbors on same MICRO_SERVICE_URL, they will need to kill themselves too
