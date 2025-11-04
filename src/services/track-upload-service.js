@@ -1,8 +1,9 @@
 import createFileUploadService, { validators } from 'micro-js/file-upload-service'
+import { publishMessage } from 'micro-js'
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { uploadsDir, metadataDir } from '../lib/utils.js'
+import { rawAudioDir, uploadsDir, metadataDir } from '../lib/utils.js'
 
 /**
  * Normalize filename: replace spaces with dashes, add crypto token
@@ -39,7 +40,7 @@ function normalizeFileName(originalName, formData) {
  * Create and configure the track upload service
  * @returns {Promise<Service>} The configured upload service
  */
-export default async function createTrackUploadService({ useAuthService, pubsubService }) {
+export default async function createTrackUploadService({ useAuthService }) {
 
   /**
    * Update track metadata after successful upload
@@ -56,48 +57,80 @@ export default async function createTrackUploadService({ useAuthService, pubsubS
         throw new Error('Title is required')
       }
       
-      // Create track metadata
+      // Generate unique IDs
       const trackId = crypto.randomUUID()
+      const messageId = crypto.randomUUID()
+      
+      // Pre-generate expected filenames using part of original name for debugging
+      const ext = path.extname(file.savedName)
+      const baseNameWithToken = path.basename(file.savedName, ext)
+      
+      // Create consistent base name for all related files (transcoded, metadata)
+      const baseFileName = `${baseNameWithToken}-${trackId.split('-')[0]}`
+      const transcodedFileName = `${baseFileName}.webm`  // Opus in WebM container
+      const metadataFileName = `${baseFileName}.json`
+      
+      // Build full paths
+      const originalFilePath = path.join(rawAudioDir, file.savedName)
+      const transcodedFilePath = path.join(uploadsDir, transcodedFileName)
+      const metadataFilePath = path.join(metadataDir, metadataFileName)
+      
+      // Create initial track metadata with pending status
       const trackData = {
         id: trackId,
         title,
         description: description || '',
-        fileName: file.savedName,
+        originalFileName: file.savedName,
+        transcodedFileName: transcodedFileName,
         fileType: file.mimeType,
         fileSize: file.size,
-        duration: 60, // TODO: Extract from audio file
-        audioUrl: `/api/audio/${trackId}`,
+        audioUrl: `/api/audio/${transcodedFileName}`,
+        processingStatus: 'pending', // pending | processing | completed | failed
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         shareableLink: trackId,
-        comments: [],
-        uploadPending: false
+        comments: []
       }
       
-      // Save metadata
-      const metadataPath = path.join(metadataDir, `${trackId}.json`)
-      fs.writeFileSync(metadataPath, JSON.stringify(trackData, null, 2))
+      // Save initial metadata
+      fs.writeFileSync(metadataFilePath, JSON.stringify(trackData, null, 2))
       
       console.log(`Track uploaded successfully: ${trackData.title} (${trackId})`)
+      console.log(`Message ID: ${messageId}`)
+      console.log(`Original: ${originalFilePath}`)
+      console.log(`Transcoded: ${transcodedFilePath}`)
+      console.log(`Metadata: ${metadataFilePath}`)
       
-      // Send success response
+      // Send success response immediately
       const response = {
         success: true,
-        message: 'Track uploaded successfully',
+        message: 'Track uploaded successfully, processing in background',
         track: trackData,
         file: {
           originalName: file.originalName,
           savedName: file.savedName,
           size: file.size,
           mimeType: file.mimeType
+        },
+        processing: {
+          messageId,
+          status: 'pending'
         }
       }
       
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(response))
       
-      // publish message to process additional music metadata asynchronously
-      await pubsubService.publish('processMusicMetadata', { fileName: file.savedName })
+      // Publish message to trigger processing pipeline
+      // All three services (transcode, metadata, cleanup) will subscribe to this
+      await publishMessage('processUploadedAudio', {
+        messageId,
+        trackId,
+        originalFilePath,
+        transcodedFilePath,
+        metadataFilePath,
+        timestamp: new Date().toISOString()
+      })
       
     } catch (error) {
       console.error('Error in upload success handler:', error)
@@ -145,7 +178,7 @@ export default async function createTrackUploadService({ useAuthService, pubsubS
   }
 
   return await createFileUploadService({
-    uploadDir: uploadsDir,
+    uploadDir: rawAudioDir, // Upload to rawAudio directory first
     fileFieldName: 'audio', // Expect file field to be named 'audio'
     textFields: ['title', 'description'], // Capture these text fields
     getFileName: normalizeFileName,

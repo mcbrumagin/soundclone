@@ -7,8 +7,9 @@ import {
   HttpError
 } from 'micro-js'
 
-import createPubsubService from 'micro-js/pubsub-service'
 import initializeMusicMetadataProcessor from './services/music-meta.js'
+import initializeAudioTranscodeService from './services/audio-transcode.js'
+import initializeAudioCleanupService from './services/audio-cleanup.js'
 import createAuthService from 'micro-js/auth-service'
 import createStaticFileService from 'micro-js/static-file-service'
 import path from 'node:path'
@@ -24,7 +25,6 @@ import deleteTrack from './services/track-delete.js'
 import createComment from './services/comment-create.js'
 import updateComment from './services/comment-update.js'
 import deleteComment from './services/comment-delete.js'
-import audioStreamService from './services/audio-stream.js'
 import audioMetadataService from './services/audio-metadata.js'
 import getHealth from './services/health.js'
 
@@ -50,22 +50,23 @@ async function startServer() {
     const publicDir = path.join(__dirname, 'public')
     
     let authService = await createAuthService()
-    let pubsubService = await createPubsubService()    
     const trackUploadService = await createTrackUploadService({
-      useAuthService: authService,
-      pubsubService
+      useAuthService: authService
     })
 
     console.log('trackUploadService', trackUploadService.name)
     
-    await initializeMusicMetadataProcessor(pubsubService)
+    // Initialize processing services
+    await initializeMusicMetadataProcessor()
+    await initializeAudioTranscodeService()
+    await initializeAudioCleanupService()
 
 
     // Register all API routes - order matters! More specific routes first
     console.log('🔧 Registering routes...')
     let services = await createRoutes({
       '/health': function health() { return 'OK' },
-      '/api/audio/*': audioStreamService,  // Must be before static file service
+      // '/api/audio/*': audioStreamService,
       '/getTrackList': getTrackList,
       '/getTrackDetail': getTrackDetail,
       '/uploadTrack': trackUploadService,
@@ -84,6 +85,7 @@ async function startServer() {
           '/css/*': 'css',
           '/js/*': 'js',
           '/assets/*': 'assets',
+          '/api/audio/*': '../../data/uploads',
           '/micro-js-html/*': '../../node_modules/micro-js-html/src'
         }
       })
@@ -103,6 +105,7 @@ async function startServer() {
       isTerminating = true
 
       console.log(`${signal} received, terminating server...`)
+      await authService.terminate()
       await Promise.all(services.map(service => service?.terminate()))
       await registry.terminate()
       console.log('Server terminated')

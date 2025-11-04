@@ -7,12 +7,16 @@ const __dirname = path.dirname(__filename)
 
 export const rootDir = path.resolve(__dirname, '../../')
 export const dataDir = path.join(rootDir, 'data')
+export const rawAudioDir = path.join(dataDir, 'rawAudio')
 export const uploadsDir = path.join(dataDir, 'uploads')
 export const metadataDir = path.join(dataDir, 'metadata')
 
 export function ensureDataDirectories() {
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir)
+  }
+  if (!fs.existsSync(rawAudioDir)) {
+    fs.mkdirSync(rawAudioDir)
   }
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir)

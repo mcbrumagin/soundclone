@@ -59,14 +59,14 @@ class AudioPlayer {
     })
     
     // Reset audio element state
-    this.audio.load()
+    await this.audio.load()
     
     // Add a load event listener to track loading progress
-    const onLoadStart = () => {
-      console.log('Audio load started')
-      this.audio.removeEventListener('loadstart', onLoadStart)
-    }
-    this.audio.addEventListener('loadstart', onLoadStart, { once: true })
+    // const onLoadStart = () => {
+    //   console.log('Audio load started')
+    //   this.audio.removeEventListener('loadstart', onLoadStart)
+    // }
+    // this.audio.addEventListener('loadstart', onLoadStart, { once: true })
   }
 
   async play(trackId) {
@@ -85,7 +85,7 @@ class AudioPlayer {
     
     try {
       // Wait for the audio to be ready before playing
-      if (this.audio.readyState < 2) {
+      // if (this.audio.readyState < 2) {
         console.log('Audio not ready, waiting for canplay event...')
         await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
@@ -108,8 +108,10 @@ class AudioPlayer {
           
           this.audio.addEventListener('canplay', onCanPlay, { once: true })
           this.audio.addEventListener('error', onError, { once: true })
+          this.audio.load()
+          console.log('Audio load started')
         })
-      }
+      // }
       
       await this.audio.play()
       return true
