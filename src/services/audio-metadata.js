@@ -7,6 +7,8 @@ import { uploadsDir } from '../lib/utils.js'
 async function getAudioMetadata(filePath) {
   return new Promise((resolve) => {
     // Use ffprobe to get detailed audio metadata including duration
+
+    // TODO need to remove ffprobe as this happens in the music-meta.js event handler
     const ffprobe = spawn('ffprobe', [
       '-v', 'quiet',
       '-print_format', 'json',

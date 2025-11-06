@@ -23,6 +23,9 @@ const uploadView = new UploadView(player)
 const recordView = new RecordView(player)
 const trackDetailView = new TrackDetailView(player)
 
+// Make track detail view globally accessible for audio player
+window.trackDetailView = trackDetailView
+
 // Simple router state
 const router = {
   currentView: 'home',
@@ -32,7 +35,8 @@ const router = {
 // Global app state
 window.appState = {
   tracks: [], // will init
-  player
+  player,
+  selectedTrackId: null // For desktop sidebar
 }
 
 // TODO, targeted render helpers as part of component render fns
@@ -41,7 +45,7 @@ const App = () => {
   switch(router.currentView) {
     case 'home': 
       // Load tracks if needed
-      content = div({ class: 'track-list' }, homeView.render())
+      content = homeView.render()
       break
     case 'login':
       content = loginView.render()
@@ -61,9 +65,11 @@ const App = () => {
   }
   
   return div({ class: 'app' },
-    header({ class: 'container header-content' },
-      div({ class: 'logo' }, 'SoundClone v0'),
-      Navigation(router.currentView)
+    header({},
+      div({ class: 'header-content' },
+        div({ class: 'logo' }, 'SoundClone v0'),
+        Navigation(router.currentView)
+      )
     ),
     content
   )

@@ -294,5 +294,12 @@ export default async function initializeAudioCleanupService() {
       error
     })
   })
+
+  return {
+    name: 'audio-cleanup-service',
+    terminate: () => {
+      processingStatus.clear()
+    }
+  }
 }
 

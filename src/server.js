@@ -7,9 +7,10 @@ import {
   HttpError
 } from 'micro-js'
 
-import initializeMusicMetadataProcessor from './services/music-meta.js'
-import initializeAudioTranscodeService from './services/audio-transcode.js'
+import initializeMusicMetadataProcessor from './services/ffmpeg/music-meta.js'
+import initializeAudioTranscodeService from './services/ffmpeg/audio-transcode.js'
 import initializeAudioCleanupService from './services/audio-cleanup.js'
+import initializeWaveformGenerator from './services/ffmpeg/waveform-generator.js'
 import createAuthService from 'micro-js/auth-service'
 import createStaticFileService from 'micro-js/static-file-service'
 import path from 'node:path'
@@ -42,34 +43,34 @@ ensureDataDirectories()
 
 async function startServer() {
   try {
-    console.log('Starting SoundClone v0 with micro-js...')
-    
+    // start registry server first so services can register
     let registry = await registryServer()
-    console.log(`Registry server running on port ${PORT}`)
     
-    const publicDir = path.join(__dirname, 'public')
-    
-    let authService = await createAuthService()
-    const trackUploadService = await createTrackUploadService({
-      useAuthService: authService
-    })
+    // wait for auth before we start upload service (requires it)
+    let services = await Promise.all([
+      createAuthService(),
+      initializeAudioCleanupService()
+    ])
 
-    console.log('trackUploadService', trackUploadService.name)
-    
-    // Initialize processing services
-    await initializeMusicMetadataProcessor()
-    await initializeAudioTranscodeService()
-    await initializeAudioCleanupService()
+    if (!process.env.ENVIRONMENT?.includes('prod')) {
+      console.warn('non-prod environment; initializing ffmpeg services')
+      services = services.concat(await Promise.all([
+        initializeMusicMetadataProcessor(),
+        initializeAudioTranscodeService(),
+        initializeWaveformGenerator(),
+      ]))
+    } else console.warn('prod environment; ffmpeg services should run separately')
 
-
-    // Register all API routes - order matters! More specific routes first
-    console.log('🔧 Registering routes...')
-    let services = await createRoutes({
+    // register routes - order matters
+    services = services.concat(await createRoutes({
       '/health': function health() { return 'OK' },
       // '/api/audio/*': audioStreamService,
       '/getTrackList': getTrackList,
       '/getTrackDetail': getTrackDetail,
-      '/uploadTrack': trackUploadService,
+      '/uploadTrack': await createTrackUploadService({
+        useAuthService: 'auth-service',
+        publishFileEvents: true // publishes to channel "micro:file-uploaded"
+      }),
       '/updateTrack': updateTrack,
       '/deleteTrack': deleteTrack,
       '/createComment': createComment,
@@ -78,24 +79,23 @@ async function startServer() {
       '/getAudioMetadata': audioMetadataService,
       '/getHealth': getHealth,
       '/*': await createStaticFileService({
-        rootDir: publicDir,
+        rootDir: path.join(__dirname, 'public'),
         urlRoot: '/',
+        autoRefresh: { mode: 'pubsub' }, // listens to channel "micro:file-uploaded"
         fileMap: {
           '/': 'index.html',
           '/css/*': 'css',
           '/js/*': 'js',
           '/assets/*': 'assets',
           '/api/audio/*': '../../data/uploads',
+          '/api/waveforms/*': '../../data/waveforms',
           '/micro-js-html/*': '../../node_modules/micro-js-html/src'
         }
       })
-    })
+    }))
     
-    console.log('🔧 Routes registered successfully')
-    console.log('🔧 Registered services:', Object.keys(services))
+    console.log(`🔧 Registered services:\n  - ${services.map(service => service?.name).join('\n  - ')}`)
     console.log(`SoundClone v0 server running on http://localhost:${PORT}`)
-    console.log(`API health check: http://localhost:${PORT}/api/health`)
-    console.log(`🎵 Audio streaming: http://localhost:${PORT}/api/audio/test-track.wav`)
 
     // TODO shutdown helper in registry that calls terminate on all services then kills itself
     // services will need to be aware of any same host neighbors on same MICRO_SERVICE_URL, they will need to kill themselves too
@@ -105,9 +105,10 @@ async function startServer() {
       isTerminating = true
 
       console.log(`${signal} received, terminating server...`)
-      await authService.terminate()
-      await Promise.all(services.map(service => service?.terminate()))
+
+      await Promise.all(services.map(service => service?.terminate?.()))
       await registry.terminate()
+
       console.log('Server terminated')
       process.exit(0)
     }

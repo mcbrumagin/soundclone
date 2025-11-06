@@ -139,7 +139,7 @@ async function transcodeToOpus(inputPath, outputPath) {
  * @param {Object} message - Message from pubsub
  */
 async function processAudioTranscode(message) {
-  const { messageId, trackId, originalFilePath, transcodedFilePath } = message
+  const { messageId, trackId, originalFilePath, transcodedFilePath, metadataFilePath } = message
   
   logger.info(`[${messageId}] Processing transcode for track ${trackId}`)
   
@@ -168,6 +168,7 @@ async function processAudioTranscode(message) {
         messageId,
         trackId,
         transcodedFilePath,
+        metadataFilePath, // Pass through for waveform generator
         timestamp: new Date().toISOString()
       })
     } else {
@@ -197,5 +198,7 @@ export default async function initializeAudioTranscodeService() {
   await createSubscription('processUploadedAudio', async (message) => {
     await processAudioTranscode(message)
   })
+
+  return { name: 'audio-transcode-listener' }
 }
 

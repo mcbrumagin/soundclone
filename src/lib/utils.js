@@ -10,6 +10,7 @@ export const dataDir = path.join(rootDir, 'data')
 export const rawAudioDir = path.join(dataDir, 'rawAudio')
 export const uploadsDir = path.join(dataDir, 'uploads')
 export const metadataDir = path.join(dataDir, 'metadata')
+export const waveformsDir = path.join(dataDir, 'waveforms')
 
 export function ensureDataDirectories() {
   if (!fs.existsSync(dataDir)) {
@@ -23,6 +24,9 @@ export function ensureDataDirectories() {
   }
   if (!fs.existsSync(metadataDir)) {
     fs.mkdirSync(metadataDir)
+  }
+  if (!fs.existsSync(waveformsDir)) {
+    fs.mkdirSync(waveformsDir)
   }
 }
 

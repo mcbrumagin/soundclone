@@ -4,6 +4,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { rawAudioDir, uploadsDir, metadataDir } from '../lib/utils.js'
+import Logger from 'micro-js/logger'
+const logger = new Logger({ logGroup: 'track-upload-service' })
 
 /**
  * Normalize filename: replace spaces with dashes, add crypto token
@@ -58,7 +60,6 @@ export default async function createTrackUploadService({ useAuthService }) {
       }
       
       // Generate unique IDs
-      const trackId = crypto.randomUUID()
       const messageId = crypto.randomUUID()
       
       // Pre-generate expected filenames using part of original name for debugging
@@ -66,9 +67,10 @@ export default async function createTrackUploadService({ useAuthService }) {
       const baseNameWithToken = path.basename(file.savedName, ext)
       
       // Create consistent base name for all related files (transcoded, metadata)
-      const baseFileName = `${baseNameWithToken}-${trackId.split('-')[0]}`
-      const transcodedFileName = `${baseFileName}.webm`  // Opus in WebM container
-      const metadataFileName = `${baseFileName}.json`
+      // Use baseNameWithToken as the trackId for simplicity (matches filenames)
+      const trackId = baseNameWithToken
+      const transcodedFileName = `${baseNameWithToken}.webm`  // Opus in WebM container
+      const metadataFileName = `${baseNameWithToken}.json`
       
       // Build full paths
       const originalFilePath = path.join(rawAudioDir, file.savedName)
@@ -77,7 +79,7 @@ export default async function createTrackUploadService({ useAuthService }) {
       
       // Create initial track metadata with pending status
       const trackData = {
-        id: trackId,
+        id: trackId,  // Uses filename base for simplicity
         title,
         description: description || '',
         originalFileName: file.savedName,
@@ -88,7 +90,7 @@ export default async function createTrackUploadService({ useAuthService }) {
         processingStatus: 'pending', // pending | processing | completed | failed
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        shareableLink: trackId,
+        shareableLink: trackId,  // Same as id for simplicity
         comments: []
       }
       
@@ -117,6 +119,8 @@ export default async function createTrackUploadService({ useAuthService }) {
           status: 'pending'
         }
       }
+
+      logger.info('Upload success track info:', response.track)
       
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(response))
@@ -182,7 +186,7 @@ export default async function createTrackUploadService({ useAuthService }) {
     fileFieldName: 'audio', // Expect file field to be named 'audio'
     textFields: ['title', 'description'], // Capture these text fields
     getFileName: normalizeFileName,
-    validateFile: validators.mimeType(['audio/*']), // Accept any audio type
+    validateFile: validators.mimeType(['audio/*', 'video/*']), // Accept any audio type
     onSuccess: onUploadSuccess,
     onError: onUploadError,
     useAuthService

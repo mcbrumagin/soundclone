@@ -154,4 +154,6 @@ export default async function initializeMusicMetadataProcessor() {
   await createSubscription('processUploadedAudio', async (message) => {
     await processAudioMetadata(message)
   })
+
+  return { name: 'audio-metadata-listener' }
 }

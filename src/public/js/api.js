@@ -150,6 +150,7 @@ export const deleteTrack = async trackId => {
 
 // Comment operations
 export const addComment = async (trackId, text) => {
+  console.log('addComment', trackId, text)
   const json = await callService('createComment', { trackId, text })
   return json.comment
 }

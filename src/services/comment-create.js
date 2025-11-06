@@ -8,7 +8,8 @@ function parseCommentTimestamp(text) {
   let trackTimestamp = null
   
   if (hasTimestamp) {
-    const match = text.match(/@(\d{2}):(\d{2})/)
+    // Match @m:ss or @mm:ss formats
+    const match = text.match(/@(\d{1,2}):(\d{2})/)
     if (match) {
       const minutes = parseInt(match[1])
       const seconds = parseInt(match[2])
@@ -23,7 +24,8 @@ export default async function createComment(payload, request) {
   try {
     console.log('createComment service called')
     const { trackId, text } = payload || {}
-    
+
+    console.log('createComment service payload', payload)
     if (!trackId) {
       const error = new Error('Track ID is required')
       error.status = 400

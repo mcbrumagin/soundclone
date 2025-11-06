@@ -8,6 +8,7 @@ export default class UploadView {
     this.selectedFile = null
     this.dragover = false
     this.uploading = false
+    this.uploadStatus = null
     this.title = ''
     this.description = ''
   }
@@ -64,23 +65,28 @@ export default class UploadView {
     const description = descriptionInput?.value.trim()
     
     this.uploading = true
+    this.uploadStatus = 'Uploading...'
     window.renderApp()
     
     try {
       // Use multipart upload with progress tracking
-      const track = await uploadTrack(this.selectedFile, title, description, (percent, loaded, total) => {
+      const response = await uploadTrack(this.selectedFile, title, description, (percent, loaded, total) => {
         console.log(`Upload progress: ${percent.toFixed(1)}%`)
-        // TODO: Update UI with progress bar
+        this.uploadStatus = `Uploading... ${percent.toFixed(0)}%`
+        window.renderApp()
       })
-      console.log('Track uploaded successfully:', track)
+      console.log('Track uploaded successfully:', response)
+      
+      // Start polling for processing completion
+      this.uploadStatus = 'Processing audio (transcoding & metadata extraction)...'
+      window.renderApp()
+      
+      await this.pollForCompletion(response.id)
       
       // Reset form
       this.reset()
       
-      // Refresh tracks list
-      window.tracks = await getTracks()
-      
-      alert('Track uploaded successfully!')
+      alert('Track processed successfully!')
       
       // Navigate back to home and re-render
       window.location.hash = '#home'
@@ -90,8 +96,59 @@ export default class UploadView {
       alert('Failed to upload track. Please try again.')
     } finally {
       this.uploading = false
+      this.uploadStatus = null
       window.renderApp()
     }
+  }
+
+  async pollForCompletion(trackId, maxAttempts = 60, intervalMs = 2000) {
+    let attempts = 0
+    
+    return new Promise((resolve, reject) => {
+      const checkInterval = setInterval(async () => {
+        attempts++
+        
+        try {
+          // Refresh tracks list
+          const tracks = await getTracks()
+          appState.tracks = tracks
+          
+          const track = tracks.find(t => t.id === trackId)
+          
+          if (!track) {
+            clearInterval(checkInterval)
+            reject(new Error('Track not found'))
+            return
+          }
+          
+          console.log(`Polling attempt ${attempts}: status = ${track.processingStatus}`)
+          this.uploadStatus = `Processing audio... (${attempts * 2}s elapsed)`
+          window.renderApp()
+          
+          if (track.processingStatus === 'completed') {
+            clearInterval(checkInterval)
+            console.log('Track processing completed!')
+            resolve(track)
+            return
+          }
+          
+          if (track.processingStatus === 'failed') {
+            clearInterval(checkInterval)
+            reject(new Error('Track processing failed'))
+            return
+          }
+          
+          if (attempts >= maxAttempts) {
+            clearInterval(checkInterval)
+            reject(new Error('Processing timeout - taking longer than expected'))
+            return
+          }
+        } catch (error) {
+          console.error('Error polling for track status:', error)
+          // Continue polling on error
+        }
+      }, intervalMs)
+    })
   }
 
   reset() {
@@ -188,12 +245,14 @@ export default class UploadView {
             placeholder: 'Enter a description (optional)'
           }, this.description || '')
         ),
+        this.uploadStatus && div({ 
+          style: 'background-color: var(--light-gray); padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;' 
+        }, this.uploadStatus),
         button({ 
           id: 'uploadButton',
-          // TODO
-          // disabled: console.log(`selected file: ${this.selectedFile}`) && !this.selectedFile || this.uploading,
+          disabled: !this.selectedFile || this.uploading,
           onclick: () => this.handleUpload()
-        }, this.uploading ? 'Uploading...' : 'Upload')
+        }, this.uploading ? this.uploadStatus || 'Uploading...' : 'Upload')
       )
     )
   }

@@ -1,6 +1,7 @@
 import { htmlTags } from 'micro-js-html'
+import TrackDetailView from './track-detail.js'
 
-const { div, h2, button, a, span, header, i } = htmlTags
+const { div, h2, button, a, span, header, i, p, main } = htmlTags
 
 // Format seconds to mm:ss
 const formatTime = (seconds) => {
@@ -12,7 +13,9 @@ const formatTime = (seconds) => {
 
 export default class HomeView {
   constructor() {
-
+    this.trackDetailView = new TrackDetailView()
+    // Make it globally accessible for audio player updates
+    window.trackDetailView = this.trackDetailView
   }
 
   togglePlayPause() {
@@ -34,18 +37,16 @@ export default class HomeView {
 
   getTrackState(track) {
     const { isPlaying, currentTrack } = appState.player
-    const isThisTrackPlaying = isPlaying && currentTrack.id === track.id
-    const isThisTrackPaused = !isPlaying && currentTrack.id === track.id
-    return { isThisTrackPlaying, isThisTrackPaused }
+    const isThisTrackPlaying = currentTrack && isPlaying && currentTrack.id === track.id
+    const isThisTrackPaused = currentTrack && !isPlaying && currentTrack.id === track.id
+    return { currentTrack, isPlaying, isThisTrackPlaying, isThisTrackPaused }
   }
 
   renderPlayButton(element) {
     // element.data
     let track = appState.tracks.find(t => t.id === (element.id || element?.dataset?.trackId))
-    let { isPlaying, currentTrack } = appState.player
-    const isThisTrackPlaying = isPlaying && currentTrack.id === track.id
-    const isThisTrackPaused = !isPlaying && currentTrack.id === track.id
-    console.log({trackId: track.id, isThisTrackPlaying, isThisTrackPaused})
+    let { currentTrack, isPlaying, isThisTrackPlaying, isThisTrackPaused } = this.getTrackState(track)
+    console.log({trackId: track.id, currentTrack, isThisTrackPlaying, isThisTrackPaused})
     return span(
       i({ class: isThisTrackPlaying ? 'fas fa-pause' : 'fas fa-play' }), 
       isThisTrackPlaying ? ' Pause' : isThisTrackPaused ? 'Resume' : ' Play'
@@ -53,7 +54,25 @@ export default class HomeView {
   }
 
   renderTrackCard(track) {
-    return div({ class: 'track-card' },
+    return div({ 
+      class: 'track-card',
+      onclick: (e) => {
+        // On desktop, clicking card opens sidebar (unless clicking on interactive elements)
+        if (window.innerWidth > 1024) {
+          // Don't trigger if clicking on buttons or links
+          if (e.target.tagName === 'BUTTON' || 
+              e.target.tagName === 'A' || 
+              e.target.closest('button') || 
+              e.target.closest('a')) {
+            return
+          }
+          
+          appState.selectedTrackId = track.id
+          window.renderApp()
+        }
+      },
+      style: window.innerWidth > 1024 ? 'cursor: pointer;' : ''
+    },
       div({ class: 'track-card-header' },
         h2({ class: 'track-title' }, track.title),
         div({ class: 'track-date' }, 
@@ -64,7 +83,8 @@ export default class HomeView {
         button({ 
           class: `play-track audio-control`,
           "data-track-id": track.id,
-          onClick: () => {
+          onClick: (e) => {
+            e.stopPropagation() // Prevent card click
             let { isThisTrackPlaying } = this.getTrackState(track)
             if (isThisTrackPlaying) appState.player.pause()
             else appState.player.play(track.id)
@@ -76,19 +96,69 @@ export default class HomeView {
           class: 'secondary view-track', 
           'data-view': 'track-detail',
           'data-track-id': track.id,
-          href: `#track-detail/${track.id}` 
-        }, 'View Details')
+          href: `#track-detail/${track.id}`
+          // Normal navigation - goes to full detail page on both mobile and desktop
+        }, 'Full Page')
       )
+    )
+  }
+
+  renderTrackDetailSidebar(track) {
+    if (!track) return null
+    
+    // Store the current track in the detail view
+    this.trackDetailView.currentTrack = track
+    this.trackDetailView.comments = track.comments || []
+    
+    // Get the full detail view content
+    const detailContent = this.trackDetailView.render(track)
+    
+    // Extract the inner content (skip the outer main and back button)
+    // We'll wrap it in our sidebar container with close button
+    return div({ class: 'track-detail-sidebar' },
+      button({ 
+        class: 'close-detail',
+        onclick: () => {
+          appState.selectedTrackId = null
+          window.renderApp()
+        }
+      }, '✕'),
+      // Render the detail view content directly
+      ...detailContent.children.slice(1) // Skip the back button
     )
   }
 
   render() {
     if (!appState.tracks || appState.tracks.length === 0) {
-      return div({ class: 'loading' }, 'No tracks found')
+      return main({ class: 'container' },
+        div({ class: 'loading' }, 'No tracks found')
+      )
     }
 
-    return div({ class: 'track-list' }, 
-      ...appState.tracks.map(track => this.renderTrackCard(track))
+    const selectedTrack = appState.selectedTrackId 
+      ? appState.tracks.find(t => t.id === appState.selectedTrackId)
+      : null
+
+    // Check if we're on desktop (> 1024px)
+    const isDesktop = typeof window !== 'undefined' && window.innerWidth > 1024
+
+    if (isDesktop && selectedTrack) {
+      return main({ class: 'container' },
+        div({ class: 'home-layout' },
+          div({ class: 'track-list-column' },
+            div({ class: 'track-list' }, 
+              ...appState.tracks.map(track => this.renderTrackCard(track))
+            )
+          ),
+          this.renderTrackDetailSidebar(selectedTrack)
+        )
+      )
+    }
+
+    return main({ class: 'container' },
+      div({ class: 'track-list' }, 
+        ...appState.tracks.map(track => this.renderTrackCard(track))
+      )
     )
   }
 }

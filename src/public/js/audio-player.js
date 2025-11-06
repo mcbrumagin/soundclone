@@ -77,15 +77,17 @@ class AudioPlayer {
 
     let track = appState.tracks.find(t => t.id === trackId)
 
-    // console.log({track, trackId, current: this.currentTrack})
-
-    if (!this.currentTrack || track && this.currentTrack.id !== track.id) {
-      this.loadTrack(track)
+    // Check if we need to load a new track
+    const needsNewTrack = !this.currentTrack || (track && this.currentTrack.id !== track.id)
+    
+    if (needsNewTrack) {
+      await this.loadTrack(track)
     }
     
     try {
-      // Wait for the audio to be ready before playing
-      // if (this.audio.readyState < 2) {
+      // Only wait for canplay and reload if we loaded a new track
+      // Otherwise, just resume from current position
+      if (needsNewTrack || this.audio.readyState < 2) {
         console.log('Audio not ready, waiting for canplay event...')
         await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
@@ -108,10 +110,16 @@ class AudioPlayer {
           
           this.audio.addEventListener('canplay', onCanPlay, { once: true })
           this.audio.addEventListener('error', onError, { once: true })
-          this.audio.load()
-          console.log('Audio load started')
+          
+          // Only call load() if we loaded a new track
+          if (needsNewTrack) {
+            this.audio.load()
+            console.log('Audio load started for new track')
+          }
         })
-      // }
+      } else {
+        console.log('Audio ready, resuming playback from', this.audio.currentTime)
+      }
       
       await this.audio.play()
       return true
@@ -197,6 +205,12 @@ class AudioPlayer {
       // console.log('timeupdate event', data)
       let { currentTime, duration } = this.audio
       this.updateProgress({ currentTime, duration })
+      
+      // Update waveform progress if track detail view exists
+      if (window.trackDetailView && this.currentTrack) {
+        const trackDuration = this.currentTrack.duration || duration
+        window.trackDetailView.updateWaveformProgress(currentTime, trackDuration)
+      }
     })
 
     this.audio.addEventListener('loaded', data => {
@@ -212,7 +226,7 @@ class AudioPlayer {
       this.isPlaying = true
       this.isPaused = true
       window.renderAudioButtons()
-      // window.renderApp()
+      window.renderApp()  // Re-render to show waveform progress for newly playing track
     })
 
     this.audio.addEventListener('pause', data => {
@@ -220,7 +234,7 @@ class AudioPlayer {
       this.isPlaying = false
       this.isPaused = true
       window.renderAudioButtons()
-      // window.renderApp()
+      window.renderApp()  // Re-render to update UI state
     })
 
     this.audio.addEventListener('ended', data => {
