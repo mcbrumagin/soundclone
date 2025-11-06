@@ -18,9 +18,9 @@ from dataclasses import dataclass
 # Add parent directory to path to import microjs
 # sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../../micro-jslanguages/python'))
 
-from microjs import create_service_sync
+from microjs import create_subscription_sync
 
-
+import traceback
 
 @dataclass
 class KeyEstimator:
@@ -63,54 +63,30 @@ class KeyEstimator:
     for mode, weights in self.mode_weights.items():
       coefficients[mode] = weights.T.dot(x) / self.mode_weight_norms[mode] / x_norm
       
-    best_mode = max(coefficients, key=coefficients.get)
-    best_coefficient = coefficients[best_mode]
+    print(f"Coefficients: {coefficients}")
+    # print(f"get?: {coefficients.get}")
 
-    return best_mode, best_coefficient, coefficients
+    estimates = [ (mode, np.argmax(coefficient)) for mode, coefficient in coefficients.items() ]
+    print(f"Estimates: {estimates}")
+    return estimates
+
+    # TODO fails here w/ The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+    # best_mode = max(coefficients, key=coefficients.get)
+    # best_coefficient = coefficients[best_mode]
+
+    # return best_mode, best_coefficient, coefficients
 
 
 
 key_estimator = KeyEstimator() # singleton
 
-async def process_audio(audio_file: str) -> tuple[str, float, list[tuple[str, float]]]:
-  """Process an audio file and return the key, bpm, and time signature
-  
-  Args:
-    audio_file: str, path to audio file
-    
-  Returns:
-    tuple[str, float, list[tuple[str, float]]]: key, bpm, and time signature
-  """
-  # Load the audio file
-  y, sr = librosa.load(audio_file)
-
-  # Compute the onset strength envelope
-  onset_env = librosa.onset.onset_strength(y=y, sr=sr)
-
-  # Estimate the tempo (BPM)
-  tempo = librosa.beat.tempo(onset_envelope=onset_env, sr=sr)
-
-  # Compute the chroma features
-  chroma = librosa.feature.chroma_stft(y=y, sr=sr)
-  avg_chroma = np.mean(chroma, axis=1)
-
-  # Estimate the key
-  key, key_confidence, key_coefficients = key_estimator(avg_chroma)
-
-  return tempo[0], key, key_confidence, key_coefficients
-
-
 
 # Set registry URL
 os.environ['MICRO_REGISTRY_URL'] = os.getenv('MICRO_REGISTRY_URL', 'http://localhost:3000')
 
-# Store received messages for demonstration
-received_messages = []
-
 async def message_handler(message):
     """Handler for channel messages"""
     print(f"📨 Received message: {message}")
-    received_messages.append(message)
 
     # const { messageId, trackId, originalFilePath, transcodedFilePath, metadataFilePath } = message
     # TODO is there a better way to get the message data?
@@ -131,72 +107,40 @@ async def message_handler(message):
 
 
     # Compute the chroma features
-    chroma = librosa.feature.chroma_stft(y=y, sr=sr)
-    avg_chroma = np.mean(chroma, axis=1)
+    try:
+      chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+      avg_chroma = np.mean(chroma, axis=1)
 
+      # key, key_confidence, key_coefficients = key_estimator(avg_chroma)
+      estimates = key_estimator(avg_chroma)
+    except Exception:
+      traceback.print_exc()
+    
 
 
     print(f"Estimated tempo: {tempo[0]:.2f} BPM")
+    print(f"Estimated key: {key} with confidence {key_confidence}")
+    print(f"Key coefficients: {key_coefficients}")
 
     return {"status": "processed", "timestamp": time.time()}
 
 
-# TODO use direct subscribe method instead of pubsub-subscriber service
-async def pubsub_subscriber(self, payload):
-    """
-    A service that can subscribe to channels
-    Uses 'self' to access service context (subscribe)
-    """
-    action = payload.get('action', 'status')
-    
-    if action == 'subscribe':
-        channel = payload.get('channel', 'test-channel')
-        print(f"Subscribing to channel '{channel}'...")
-        
-        # Subscribe to channel
-        sub_id = await self.subscribe(channel, message_handler)
-        
-        return {
-            "service": "pubsub-subscriber",
-            "action": "subscribed",
-            "channel": channel,
-            "subscriptionId": sub_id
-        }
-    
-    elif action == 'status':
-        return {
-            "service": "pubsub-subscriber",
-            "receivedMessages": len(received_messages),
-            "messages": received_messages[-10:]  # Last 10 messages
-        }
-    
-    else:
-        return {
-            "service": "pubsub-subscriber",
-            "error": f"Unknown action: {action}",
-            "validActions": ["subscribe", "status"]
-        }
-
 if __name__ == '__main__':
     print("Starting pubsub-subscriber service...")
     print(f"Registry URL: {os.environ['MICRO_REGISTRY_URL']}")
-    print("\nThis service can subscribe to channels and track received messages")
-    print("Examples:")
-    print("  Subscribe: {\"action\": \"subscribe\", \"channel\": \"test-channel\"}")
-    print("  Status:    {\"action\": \"status\"}")
+    print("\nThis service subscribes to the 'processUploadedAudio' channel")
     
     # Create and register the service
-    service = create_service_sync("pubsub-subscriber", pubsub_subscriber)
-    
-    print(f"\n✓ Service '{service.name}' is running at {service.location}")
+    sub_id = create_subscription_sync('processUploadedAudio', message_handler)
+
+    print(f"Subscribed to channel 'processUploadedAudio' with ID: {sub_id}")
     print("Press Ctrl+C to stop...")
     
     # Keep service running
     try:
-        while True:
-            time.sleep(1)
+      while True:
+        time.sleep(1)
     except KeyboardInterrupt:
-        print("\nShutting down...")
-        service.terminate()
-        print("Service stopped")
-
+      print("\nShutting down...")
+      sub_id.terminate()
+      print("Service stopped")
