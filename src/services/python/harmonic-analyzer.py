@@ -57,24 +57,51 @@ class KeyEstimator:
   def __call__(self, x: np.array) -> tuple[str, float, list[tuple[str, float]]]:
     x = scipy.stats.zscore(x)
     x_norm = scipy.linalg.norm(x)
+    
+    # Simplified mapping (using sharps for display)
+    note_names_simple = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
     coefficients = {}
+    all_estimates = []
 
     for mode, weights in self.mode_weights.items():
       coefficients[mode] = weights.T.dot(x) / self.mode_weight_norms[mode] / x_norm
       
-    print(f"Coefficients: {coefficients}")
-    # print(f"get?: {coefficients.get}")
-
-    estimates = [ (mode, np.argmax(coefficient)) for mode, coefficient in coefficients.items() ]
-    print(f"Estimates: {estimates}")
-    return estimates
-
-    # TODO fails here w/ The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
-    # best_mode = max(coefficients, key=coefficients.get)
-    # best_coefficient = coefficients[best_mode]
-
-    # return best_mode, best_coefficient, coefficients
+      # Find best key for this mode
+      best_key_idx = np.argmax(coefficients[mode])
+      best_correlation = coefficients[mode][best_key_idx]
+      
+      # Simplified mode name (major/minor)
+      mode_simple = 'major' if mode == 'ionian' else 'minor' if mode == 'aeolian' else mode
+      
+      all_estimates.append({
+        'mode': mode,
+        'mode_simple': mode_simple,
+        'key_index': int(best_key_idx),
+        'key': note_names_simple[best_key_idx],
+        'correlation': float(best_correlation),
+        'full_name': f"{note_names_simple[best_key_idx]} {mode_simple}",
+        'coefficients': coefficients[mode].tolist()
+      })
+      
+    # Sort by correlation to find the overall best
+    all_estimates.sort(key=lambda x: x['correlation'], reverse=True)
+    
+    print(f"\n=== Key Detection Results ===")
+    print(f"Top 5 estimates:")
+    for i, est in enumerate(all_estimates[:5], 1):
+      print(f"  {i}. {est['full_name']}: {est['correlation']:.4f}")
+    
+    best_estimate = all_estimates[0]
+    print(f"\nBest guess: {best_estimate['full_name']} (confidence: {best_estimate['correlation']:.4f})")
+    
+    # Also show top result for each common mode
+    print(f"\nBy mode:")
+    for mode in ['ionian', 'aeolian']:
+      mode_est = next(e for e in all_estimates if e['mode'] == mode)
+      print(f"  {mode_est['mode_simple'].title()}: {mode_est['key']} ({mode_est['correlation']:.4f})")
+    
+    return best_estimate['full_name'], best_estimate['correlation'], all_estimates
 
 
 
@@ -108,19 +135,27 @@ async def message_handler(message):
 
     # Compute the chroma features
     try:
-      chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+      # Use CQT (Constant-Q Transform) instead of STFT for better music analysis
+      # CQT has logarithmically-spaced frequency bins, better for music pitch
+      y_harmonic = librosa.effects.harmonic(y)  # Remove percussive elements
+      chroma = librosa.feature.chroma_cqt(y=y_harmonic, sr=sr)
       avg_chroma = np.mean(chroma, axis=1)
+      
+      note_names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+      print(f"\nAverage chroma vector:")
+      for i, (note, val) in enumerate(zip(note_names, avg_chroma)):
+        print(f"  {note:2s}: {val:.4f}")
 
-      # key, key_confidence, key_coefficients = key_estimator(avg_chroma)
-      estimates = key_estimator(avg_chroma)
+      key, key_confidence, estimates = key_estimator(avg_chroma)
+      
+      print(f"\nEstimated tempo: {tempo[0]:.2f} BPM")
+      print(f"Estimated key: {key} with confidence {key_confidence:.4f}")
+      
     except Exception:
       traceback.print_exc()
-    
-
-
-    print(f"Estimated tempo: {tempo[0]:.2f} BPM")
-    print(f"Estimated key: {key} with confidence {key_confidence}")
-    print(f"Key coefficients: {key_coefficients}")
+      key = 'Unknown'
+      key_confidence = 0.0
+      estimates = []
 
     return {"status": "processed", "timestamp": time.time()}
 
