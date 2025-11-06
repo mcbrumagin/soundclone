@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import fsPromises from 'node:fs/promises'
 import path from 'node:path'
-import { createSubscription } from 'micro-js'
+import { createSubscriptionService } from 'micro-js'
 import Logger from 'micro-js/logger'
 
 const logger = new Logger({ logGroup: 'audio-cleanup' })
@@ -276,30 +276,34 @@ export default async function initializeAudioCleanupService() {
   logger.info('Initializing audio cleanup service')
   
   // Subscribe to main processing message
-  await createSubscription('processUploadedAudio', async (message) => {
-    // Don't await - run async in background
-    processCleanup(message).catch(err => {
-      logger.error(`[${message.messageId}] Cleanup service error:`, err)
-    })
-  })
-  
-  // Subscribe to failure events to short-circuit processing
-  await createSubscription('audioProcessingFailed', async (message) => {
-    const { trackId, service, error } = message
-    logger.warn(`[${message.messageId}] Processing failure detected from ${service}`)
-    
-    processingStatus.set(trackId, {
-      failed: true,
-      service,
-      error
-    })
+  let cleanupService = await createSubscriptionService('audio-cleanup-service', {
+    'processUploadedAudio': async (message) => {
+      // Don't await - run async in background
+      processCleanup(message).catch(err => {
+        logger.error(`[${message.messageId}] Cleanup service error:`, err)
+      })
+    },
+    'audioProcessingFailed': async (message) => {
+      const { trackId, service, error } = message
+      logger.warn(`[${message.messageId}] Processing failure detected from ${service}`)
+      
+      processingStatus.set(trackId, {
+        failed: true,
+        service,
+        error
+      })
+    },
+    'waveformComplete': async (message) => {
+      const { trackId } = message
+      logger.info(`[${message.messageId}] Waveform complete for track ${trackId}`)
+      // TODO?
+      // processingStatus.set(trackId, {
+      //   completed: true,
+      //   service: 'audio-cleanup'
+      // })
+    }
   })
 
-  return {
-    name: 'audio-cleanup-service',
-    terminate: () => {
-      processingStatus.clear()
-    }
-  }
+  return cleanupService
 }
 

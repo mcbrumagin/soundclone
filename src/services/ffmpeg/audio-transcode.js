@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import path from 'node:path'
-import { createSubscription, publishMessage } from 'micro-js'
+import { createSubscriptionService, publishMessage } from 'micro-js'
 import Logger from 'micro-js/logger'
 
 const logger = new Logger({ logGroup: 'audio-transcode' })
@@ -195,10 +195,10 @@ async function processAudioTranscode(message) {
 export default async function initializeAudioTranscodeService() {
   logger.info('Initializing audio transcode service')
   
-  await createSubscription('processUploadedAudio', async (message) => {
+  let transcodeService = await createSubscriptionService('audio-transcoder', 'processUploadedAudio', async (message) => {
     await processAudioTranscode(message)
   })
 
-  return { name: 'audio-transcode-listener' }
+  return transcodeService
 }
 

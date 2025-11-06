@@ -357,11 +357,11 @@ export default class TrackDetailView {
         }
       },
         // Show waveform image if available
-        track.waveformUrl && img({
+        track.waveformUrl ? img({
           src: track.waveformUrl,
           alt: 'Waveform',
           class: 'waveform-image'
-        }),
+        }) : div({ class: 'waveform-image' }, 'still processing waveform...'),
         // Only show progress if this is the currently playing track
         div({ 
           class: 'waveform-progress', 

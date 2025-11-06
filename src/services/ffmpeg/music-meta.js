@@ -2,7 +2,7 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import { spawn } from 'node:child_process'
-import { createSubscription, publishMessage } from 'micro-js'
+import { createSubscriptionService, publishMessage } from 'micro-js'
 import Logger from 'micro-js/logger'
 
 const logger = new Logger({ logGroup: 'music-meta' })
@@ -133,6 +133,16 @@ async function processAudioMetadata(message) {
       metadata: extractedMetadata,
       timestamp: new Date().toISOString()
     })
+
+    await publishMessage('micro:file-uploaded', {
+      urlPath: `/api/metadata/${path.basename(metadataFilePath)}`,
+      filePath: metadataFilePath,
+      size: fsSync.statSync(metadataFilePath).size,
+      mimeType: 'application/json',
+      originalName: path.basename(metadataFilePath),
+      savedName: path.basename(metadataFilePath),
+      timestamp: new Date().toISOString()
+    })
     
   } catch (error) {
     logger.error(`[${messageId}] Metadata extraction failed:`, error)
@@ -151,9 +161,9 @@ async function processAudioMetadata(message) {
 export default async function initializeMusicMetadataProcessor() {
   logger.info('Initializing audio metadata service')
   
-  await createSubscription('processUploadedAudio', async (message) => {
+  let metadataService = await createSubscriptionService('music-metadata-processor', 'processUploadedAudio', async (message) => {
     await processAudioMetadata(message)
   })
 
-  return { name: 'audio-metadata-listener' }
+  return metadataService
 }

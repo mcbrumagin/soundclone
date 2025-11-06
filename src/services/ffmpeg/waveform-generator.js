@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import path from 'node:path'
-import { createSubscription, publishMessage } from 'micro-js'
+import { createSubscriptionService, publishMessage } from 'micro-js'
 import Logger from 'micro-js/logger'
 
 const logger = new Logger({ logGroup: 'waveform-generator' })
@@ -156,6 +156,16 @@ async function processWaveformGeneration(message) {
       waveformFileName,
       timestamp: new Date().toISOString()
     })
+
+    await publishMessage('micro:file-uploaded', {
+      urlPath: `/api/waveforms/${waveformFileName}`,
+      filePath: waveformPath,
+      size: fsSync.statSync(waveformPath).size,
+      mimeType: 'image/png',
+      originalName: waveformFileName,
+      savedName: waveformFileName,
+      timestamp: new Date().toISOString()
+    })
     
   } catch (error) {
     logger.error(`[${messageId}] Waveform generation failed:`, error)
@@ -171,15 +181,16 @@ export default async function initializeWaveformGenerator() {
   logger.info('Initializing waveform generator service')
   
   // Subscribe to transcode completion events
-  await createSubscription('audioTranscodeComplete', async (message) => {
+  let waveformService = await createSubscriptionService('waveform-generator', 'audioTranscodeComplete', async (message) => {
     // Run async without blocking
-    processWaveformGeneration(message).catch(err => {
+    try {
+      await processWaveformGeneration(message)
+    } catch (err) {
       logger.error(`Waveform generation error:`, err)
-    })
+    }
   })
   
   logger.info(`Waveforms will be saved to: ${waveformsDir}`)
 
-  return { name: 'waveform-generator-listener' }
+  return waveformService
 }
-
