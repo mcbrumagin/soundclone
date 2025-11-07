@@ -83,6 +83,11 @@ export default class UploadView {
       
       await this.pollForCompletion(response.id)
       
+      // Notify polling service to reset backoff and check immediately
+      if (appState.trackPollingService) {
+        appState.trackPollingService.notifyUpload()
+      }
+      
       // Reset form
       this.reset()
       

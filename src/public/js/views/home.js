@@ -16,6 +16,9 @@ export default class HomeView {
     this.trackDetailView = new TrackDetailView()
     // Make it globally accessible for audio player updates
     window.trackDetailView = this.trackDetailView
+    // Bind render methods
+    this.renderTrackListOnly = this.renderTrackListOnly.bind(this)
+    this.renderSidebarOnly = this.renderSidebarOnly.bind(this)
   }
 
   togglePlayPause() {
@@ -121,14 +124,35 @@ export default class HomeView {
       button({ 
         class: 'close-detail',
         onclick: () => {
-          // TODO verify
-          // appState.selectedTrackId = null
-          // window.renderApp()
+          appState.selectedTrackId = null
+          window.renderApp()
         }
       }, '✕'),
       // Render the detail view content directly
       ...detailContent.children.slice(1) // Skip the back button
     )
+  }
+
+  // Separate render method for just the track list
+  renderTrackListOnly() {
+    if (!appState.tracks || appState.tracks.length === 0) {
+      return '<div class="loading">No tracks found</div>'
+    }
+    
+    return appState.tracks.map(track => this.renderTrackCard(track).render()).join('')
+  }
+
+  // Separate render method for just the sidebar
+  renderSidebarOnly() {
+    const selectedTrack = appState.selectedTrackId 
+      ? appState.tracks.find(t => t.id === appState.selectedTrackId)
+      : null
+    
+    if (!selectedTrack) {
+      return ''
+    }
+    
+    return this.renderTrackDetailSidebar(selectedTrack).render()
   }
 
   render() {
@@ -149,17 +173,19 @@ export default class HomeView {
       return main({ class: 'container' },
         div({ class: 'home-layout' },
           div({ class: 'track-list-column' },
-            div({ class: 'track-list' }, 
+            div({ class: 'track-list', id: 'trackList' }, 
               ...appState.tracks.map(track => this.renderTrackCard(track))
             )
           ),
-          this.renderTrackDetailSidebar(selectedTrack)
+          div({ id: 'trackDetailSidebar' },
+            this.renderTrackDetailSidebar(selectedTrack)
+          )
         )
       )
     }
 
     return main({ class: 'container' },
-      div({ class: 'track-list' }, 
+      div({ class: 'track-list', id: 'trackList' }, 
         ...appState.tracks.map(track => this.renderTrackCard(track))
       )
     )

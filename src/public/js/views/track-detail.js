@@ -213,32 +213,18 @@ export default class TrackDetailView {
         await appState.player.loadTrack(this.currentTrack)
         // Re-render to show progress elements for newly loaded track
         window.renderApp()
-        // Wait a tick for DOM to update
-        await new Promise(resolve => setTimeout(resolve, 10))
       }
-      
-      console.warn('wasNewTrack', wasNewTrack)
-      console.warn('isPlaying', appState.player.isPlaying)
-      console.warn('currentTrack', appState.player.currentTrack?.id)
-      console.warn('this.currentTrack.id', this.currentTrack.id)
       
       // Update progress immediately
       this.updateWaveformProgress(timeInSeconds, this.currentTrack.duration)
       
+      // Seek to the timestamp (works with 206/range requests)
+      appState.player.seekTo(timeInSeconds)
+      
       // Auto-play
-      if (!appState.player.isPlaying || wasNewTrack) {
-        console.warn('auto-playing')
+      if (!appState.player.isPlaying) {
         await appState.player.play(this.currentTrack.id)
-
-        // wait for loadedmetadata event
-        await new Promise(resolve => {
-          appState.player.audio.addEventListener('loadedmetadata', resolve)
-        }, { once: true })
-        console.log('loadedmetadata event', appState.player.audio.duration)
-        // Seek to the timestamp
-        appState.player.seekTo(timeInSeconds)
-        console.log('seekTo', timeInSeconds)
-      } else console.warn('not auto-playing, already playing or new track')
+      }
     }
   }
 
@@ -348,49 +334,33 @@ export default class TrackDetailView {
         id: 'waveform',
         'data-track-id': track.id,
         onclick: async (e) => {
-          // Click anywhere on waveform to seek
-          // if (e.target.classList.contains('waveform') || e.target.classList.contains('waveform-image')) {
-            const rect = e.currentTarget.getBoundingClientRect()
-            const x = e.clientX - rect.left
-            const percentage = (x / rect.width) * 100
+          const rect = e.currentTarget.getBoundingClientRect()
+          const x = e.clientX - rect.left
+          const percentage = (x / rect.width) * 100
 
-            const duration = appState.tracks.find(t => t.id === track.id).duration
-            const seekTime = (percentage / 100) * (duration || 0)
+          const duration = appState.tracks.find(t => t.id === track.id).duration
+          const seekTime = (percentage / 100) * (duration || 0)
 
-            console.warn('waveform seek calc', {
-              x, width: rect.width, percentage, seekTime, duration
-            })
+          console.log('Waveform click - seeking to:', seekTime)
 
-            appState.player.audio.addEventListener('canplay', function() {
-              console.warn('canplay event, setting currentTime', seekTime)
-              appState.player.audio.currentTime = seekTime
-            }, { once: true })
-
-            // Load this track if not current
-            const wasNewTrack = appState.player.currentTrack?.id !== track.id
-            if (wasNewTrack) {
-              await appState.player.loadTrack(track)
-              // Re-render to show progress elements for newly loaded track
-              window.renderApp()
-              // Wait a tick for DOM to update
-              await new Promise(resolve => setTimeout(resolve, 10))
-            }
-            
-            appState.player.seekTo(seekTime)
-            
-            // Update progress immediately after seeking
-            this.updateWaveformProgress(seekTime, duration)
-            
-            // Auto-play after seeking
+          // Load this track if not current
+          const wasNewTrack = appState.player.currentTrack?.id !== track.id
+          if (wasNewTrack) {
+            await appState.player.loadTrack(track)
+            // Re-render to show progress elements for newly loaded track
+            window.renderApp()
+          }
+          
+          // Seek with 206/range request support
+          appState.player.seekTo(seekTime)
+          
+          // Update progress immediately
+          this.updateWaveformProgress(seekTime, duration)
+          
+          // Auto-play after seeking
+          if (!appState.player.isPlaying) {
             await appState.player.play(track.id)
-            setTimeout(() => {
-              appState.player.seekTo(seekTime)
-            }, 20)
-
-            setTimeout(() => {
-              appState.player.seekTo(seekTime)
-            }, 100)
-          // }
+          }
         }
       },
         // Show waveform image if available

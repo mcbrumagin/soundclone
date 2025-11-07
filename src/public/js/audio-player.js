@@ -1,5 +1,4 @@
 import { htmlTags } from 'micro-js-html'
-import { getAudioMetadata } from './api.js'
 const { div, input, button, span } = htmlTags
 
 class AudioPlayer {
@@ -20,29 +19,6 @@ class AudioPlayer {
     let audioSrc
     if (track.fileName) {
       audioSrc = `/api/audio/${track.fileName}`
-      
-      // Fetch real duration from server if not already available
-      if (!track.realDuration && track.fileName) {
-        try {
-          console.log('Fetching audio metadata for:', track.fileName)
-          const metadataResponse = await getAudioMetadata(track.fileName)
-          if (metadataResponse.success && metadataResponse.metadata) {
-            track.realDuration = metadataResponse.metadata.duration
-            track.audioMetadata = metadataResponse.metadata
-            console.log('Got audio metadata:', metadataResponse.metadata)
-            
-            // Update the track in appState if it exists there
-            const appTrack = appState.tracks?.find(t => t.id === track.id)
-            if (appTrack) {
-              appTrack.realDuration = track.realDuration
-              appTrack.audioMetadata = track.audioMetadata
-            }
-          }
-        } catch (error) {
-          console.error('Failed to fetch audio metadata:', error)
-          // Don't let metadata failure prevent audio loading
-        }
-      }
     } else if (track.audioUrl) {
       audioSrc = track.audioUrl
     } else {
@@ -51,25 +27,16 @@ class AudioPlayer {
     }
     
     this.audio.src = audioSrc
-    console.log('Loading audio from:', audioSrc, {track})
-    console.log('Browser audio support check:', {
-      canPlayWav: this.audio.canPlayType('audio/wav'),
-      canPlayMp3: this.audio.canPlayType('audio/mpeg'),
-      canPlayWebm: this.audio.canPlayType('audio/webm')
-    })
+    console.log('Loading audio from:', audioSrc)
     
     // Reset audio element state
     this.audio.load()
     
-    this.audio.addEventListener('loadstart',
-      () => console.log('Audio load started'),
-      { once: true }
-    )
-
+    // Wait for metadata to be loaded (with 206/range requests, this is fast)
     await new Promise(resolve => {
-      this.audio.addEventListener('loadedmetadata', resolve)
-    }, { once: true })
-    console.log('done waiting for loadedmetadata event')
+      this.audio.addEventListener('loadedmetadata', resolve, { once: true })
+    })
+    console.log('Audio metadata loaded, duration:', this.audio.duration)
   }
 
   async play(trackId) {

@@ -9,6 +9,7 @@ import RecordView from './views/record.js'
 import TrackDetailView from './views/track-detail.js'
 import AudioPlayer from './audio-player.js'
 import { getTracks } from './api.js'
+import TrackPollingService from './services/track-polling.js'
 
 const { div, header } = htmlTags
 
@@ -32,11 +33,15 @@ const router = {
   currentTrackId: null // only for router
 }
 
+// Initialize polling service
+const trackPollingService = new TrackPollingService()
+
 // Global app state
 window.appState = {
   tracks: [], // will init
   player,
-  selectedTrackId: null // For desktop sidebar
+  selectedTrackId: null, // For desktop sidebar
+  trackPollingService // Make available globally
 }
 
 // TODO, targeted render helpers as part of component render fns
@@ -92,6 +97,10 @@ window.renderAudioButtons = renderHelper('.audio-control', element => {
     return homeView.renderPlayButton(element).render()
   }
 })
+
+// Separate render helpers for track list and sidebar
+window.renderTrackList = renderHelper('#trackList', homeView.renderTrackListOnly)
+window.renderSidebar = renderHelper('#trackDetailSidebar', homeView.renderSidebarOnly)
 
 // Simple hash-based routing
 const handleRouteChange = () => {
@@ -153,6 +162,19 @@ const bootstrap = async () => {
   if (!window.location.hash) {
     window.location.hash = '#home'
   }
+
+  // Start polling for new tracks
+  trackPollingService.start((newTracks) => {
+    // Only update if tracks actually changed
+    const hasChanges = newTracks.length !== appState.tracks.length ||
+      !newTracks.every((track, i) => track.id === appState.tracks[i]?.id)
+    
+    if (hasChanges) {
+      console.log('Updating tracks from polling service')
+      appState.tracks = newTracks
+      window.renderApp()
+    }
+  })
 }
 
 bootstrap() 

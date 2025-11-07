@@ -91,6 +91,9 @@ header {
   color: var(--text-color);
   padding: 16px 20px;
   border-bottom: 1px solid var(--light-gray);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .header-content {
@@ -156,6 +159,12 @@ main {
   min-height: calc(100vh - 200px);
   max-width: 1200px;
   margin: 0 auto;
+}
+
+/* Make main scrollable on home view when track list is present */
+main.container {
+  max-height: calc(100vh - 80px - 70px); /* viewport - header - player */
+  overflow-y: auto;
 }
 
 .page-title {
@@ -232,15 +241,13 @@ main {
 }
 
 .track-detail-sidebar .track-title {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
   right: 40px;
+  margin-top: -1.8rem;
+  margin-left: .5rem;
 }
 
 .track-date {
@@ -485,27 +492,67 @@ main {
   display: flex;
   gap: 20px;
   position: relative;
+  max-height: calc(100vh - 80px - 90px); /* viewport - header approx - player */
+  overflow: hidden;
 }
 
 .track-list-column {
   flex: 1;
   min-width: 0;
+  overflow-y: auto;
+  max-height: 100%;
+  padding-right: 10px;
+}
+
+/* Scrollbar styling for track list */
+.track-list-column::-webkit-scrollbar {
+  width: 8px;
+}
+
+.track-list-column::-webkit-scrollbar-track {
+  background: var(--background-color);
+  border-radius: 4px;
+}
+
+.track-list-column::-webkit-scrollbar-thumb {
+  background: var(--medium-gray);
+  border-radius: 4px;
+}
+
+.track-list-column::-webkit-scrollbar-thumb:hover {
+  background: var(--dark-gray);
 }
 
 .track-detail-sidebar {
   width: 450px;
-  position: sticky;
-  height: fit-content;
-  /* top: 20px; */
+  flex-shrink: 0;
   padding: 2.5rem .5rem;
   margin-top: 1.15rem;
-  align-self: flex-start;
   background-color: var(--light-gray);
   border-radius: 8px;
   border: 1px solid rgba(177, 156, 217, 0.2);
-  max-height: calc(100vh - 140px);
+  max-height: 100%;
   overflow-y: auto;
   animation: slideInRight 0.3s ease-out;
+}
+
+/* Scrollbar styling for sidebar */
+.track-detail-sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.track-detail-sidebar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.track-detail-sidebar::-webkit-scrollbar-thumb {
+  background: var(--medium-gray);
+  border-radius: 4px;
+}
+
+.track-detail-sidebar::-webkit-scrollbar-thumb:hover {
+  background: var(--dark-gray);
 }
 
 /* Adjust detail view styling when in sidebar */
@@ -559,7 +606,7 @@ main {
 
 .track-detail-sidebar .close-detail {
   position: absolute;
-  top: 10px;
+  top: 30px;
   right: 10px;
   background: transparent;
   color: var(--dark-gray);
