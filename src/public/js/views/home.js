@@ -67,8 +67,10 @@ export default class HomeView {
             return
           }
           
-          appState.selectedTrackId = track.id
-          window.renderApp()
+          if (appState.selectedTrackId !== track.id) {
+            appState.selectedTrackId = track.id
+            window.renderApp() // TODO render track detail
+          }
         }
       },
       style: window.innerWidth > 1024 ? 'cursor: pointer;' : ''
@@ -119,8 +121,9 @@ export default class HomeView {
       button({ 
         class: 'close-detail',
         onclick: () => {
-          appState.selectedTrackId = null
-          window.renderApp()
+          // TODO verify
+          // appState.selectedTrackId = null
+          // window.renderApp()
         }
       }, '✕'),
       // Render the detail view content directly

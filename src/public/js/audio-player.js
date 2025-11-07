@@ -59,14 +59,17 @@ class AudioPlayer {
     })
     
     // Reset audio element state
-    await this.audio.load()
+    this.audio.load()
     
-    // Add a load event listener to track loading progress
-    // const onLoadStart = () => {
-    //   console.log('Audio load started')
-    //   this.audio.removeEventListener('loadstart', onLoadStart)
-    // }
-    // this.audio.addEventListener('loadstart', onLoadStart, { once: true })
+    this.audio.addEventListener('loadstart',
+      () => console.log('Audio load started'),
+      { once: true }
+    )
+
+    await new Promise(resolve => {
+      this.audio.addEventListener('loadedmetadata', resolve)
+    }, { once: true })
+    console.log('done waiting for loadedmetadata event')
   }
 
   async play(trackId) {
@@ -81,47 +84,14 @@ class AudioPlayer {
     const needsNewTrack = !this.currentTrack || (track && this.currentTrack.id !== track.id)
     
     if (needsNewTrack) {
+      console.warn('loading new track', track)
       await this.loadTrack(track)
-    }
+    } else console.warn('no need to load new track', track)
     
     try {
-      // Only wait for canplay and reload if we loaded a new track
-      // Otherwise, just resume from current position
-      if (needsNewTrack || this.audio.readyState < 2) {
-        console.log('Audio not ready, waiting for canplay event...')
-        await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Audio load timeout'))
-          }, 10000) // 10 second timeout
-          
-          const onCanPlay = () => {
-            clearTimeout(timeout)
-            this.audio.removeEventListener('canplay', onCanPlay)
-            this.audio.removeEventListener('error', onError)
-            resolve()
-          }
-          
-          const onError = (e) => {
-            clearTimeout(timeout)
-            this.audio.removeEventListener('canplay', onCanPlay)
-            this.audio.removeEventListener('error', onError)
-            reject(new Error(`Audio load failed: ${e.message || 'Unknown error'}`))
-          }
-          
-          this.audio.addEventListener('canplay', onCanPlay, { once: true })
-          this.audio.addEventListener('error', onError, { once: true })
-          
-          // Only call load() if we loaded a new track
-          if (needsNewTrack) {
-            this.audio.load()
-            console.log('Audio load started for new track')
-          }
-        })
-      } else {
-        console.log('Audio ready, resuming playback from', this.audio.currentTime)
-      }
-      
+      console.warn('playing track at time', this.audio.currentTime)
       await this.audio.play()
+      console.log('Audio played')
       return true
     } catch (error) {
       console.error('Play failed:', error)
@@ -144,6 +114,7 @@ class AudioPlayer {
   }
 
   seek(time) {
+    console.warn('seek', time)
     this.audio.currentTime = time
   }
 
@@ -196,7 +167,9 @@ class AudioPlayer {
 
   seekTo(time) {
     if (this.audio && !isNaN(time) && isFinite(time) && time >= 0) {
+      console.warn('seekTo', time)
       this.audio.currentTime = time
+      console.warn('seekTo set currentTime', this.audio.currentTime)
     }
   }
 
@@ -204,6 +177,7 @@ class AudioPlayer {
     this.audio.addEventListener('timeupdate', data => {
       // console.log('timeupdate event', data)
       let { currentTime, duration } = this.audio
+      console.warn('timeupdate event', currentTime, duration)
       this.updateProgress({ currentTime, duration })
       
       // Update waveform progress if track detail view exists
@@ -217,16 +191,18 @@ class AudioPlayer {
       console.log('loaded event', data)
       // duration = this.audio.duration
       // this.updateDuration(duration)
-      window.renderPlayer()
-      window.renderApp()
+      // window.renderPlayer()
+      // window.renderApp() // TODO verify
     })
 
     this.audio.addEventListener('play', data => {
       console.log('play event', data)
+      console.log('current time', this.audio.currentTime)
       this.isPlaying = true
-      this.isPaused = true
+      this.isPaused = false
       window.renderAudioButtons()
-      window.renderApp()  // Re-render to show waveform progress for newly playing track
+      // TODO verify
+      // window.renderApp()  // Re-render to show waveform progress for newly playing track
     })
 
     this.audio.addEventListener('pause', data => {
@@ -234,7 +210,8 @@ class AudioPlayer {
       this.isPlaying = false
       this.isPaused = true
       window.renderAudioButtons()
-      window.renderApp()  // Re-render to update UI state
+      // TODO verify
+      // window.renderApp()  // Re-render to update UI state
     })
 
     this.audio.addEventListener('ended', data => {

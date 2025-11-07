@@ -171,6 +171,16 @@ async function processAudioTranscode(message) {
         metadataFilePath, // Pass through for waveform generator
         timestamp: new Date().toISOString()
       })
+
+      logger.warn('publishing event for static file service')
+      await publishMessage('micro:file-updated', {
+        urlPath: `/api/audio/${path.basename(transcodedFilePath)}`,
+        filePath: transcodedFilePath,
+        size: fsSync.statSync(transcodedFilePath).size,
+        mimeType: 'audio/webm',
+        originalName: path.basename(transcodedFilePath),
+        savedName: path.basename(transcodedFilePath),
+      })
     } else {
       throw new Error(result.error || 'Transcode failed')
     }

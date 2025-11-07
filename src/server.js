@@ -69,7 +69,8 @@ async function startServer() {
       '/getTrackDetail': getTrackDetail,
       '/uploadTrack': await createTrackUploadService({
         useAuthService: 'auth-service',
-        publishFileEvents: true // publishes to channel "micro:file-uploaded"
+        publishFileEvents: true,
+        updateChannel: 'micro:file-uploaded'
       }),
       '/updateTrack': updateTrack,
       '/deleteTrack': deleteTrack,
@@ -81,7 +82,12 @@ async function startServer() {
       '/*': await createStaticFileService({
         rootDir: path.join(__dirname, 'public'),
         urlRoot: '/',
-        autoRefresh: { mode: 'pubsub' }, // listens to channel "micro:file-uploaded"
+        autoRefresh: {
+          mode: 'pubsub',
+          // doesn't listen to the initial update
+          updateChannel: 'micro:file-updated',
+          deleteChannel: 'micro:file-deleted',
+        },
         fileMap: {
           '/': 'index.html',
           '/css/*': 'css',

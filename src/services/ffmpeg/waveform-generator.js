@@ -157,7 +157,8 @@ async function processWaveformGeneration(message) {
       timestamp: new Date().toISOString()
     })
 
-    await publishMessage('micro:file-uploaded', {
+    logger.warn('publishing event for static file service')
+    await publishMessage('micro:file-updated', {
       urlPath: `/api/waveforms/${waveformFileName}`,
       filePath: waveformPath,
       size: fsSync.statSync(waveformPath).size,

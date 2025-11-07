@@ -8,10 +8,10 @@ export default async function getTrackList(payload, request, response) {
     let remoteIp = request.socket.remoteAddress
     let senderIp = request.headers['x-forwarded-for']
     console.log('remote and sender ip:', remoteIp, senderIp)
-    console.log('request headers:', request.headers)
-    response.setHeader('forwarded', request.headers.forwarded)
-    response.setHeader('Cache-Control', 'max-age=60, public')
-    response.setHeader('x-test-header', 'test value')
+    // console.log('request headers:', request.headers)
+    // response.setHeader('forwarded', request.headers.forwarded)
+    // response.setHeader('Cache-Control', 'max-age=60, public')
+    // response.setHeader('x-test-header', 'test value')
     const files = fs.readdirSync(metadataDir)
     const tracks = []
     

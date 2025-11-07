@@ -134,7 +134,8 @@ async function processAudioMetadata(message) {
       timestamp: new Date().toISOString()
     })
 
-    await publishMessage('micro:file-uploaded', {
+    logger.warn('publishing event for static file service')
+    await publishMessage('micro:file-updated', {
       urlPath: `/api/metadata/${path.basename(metadataFilePath)}`,
       filePath: metadataFilePath,
       size: fsSync.statSync(metadataFilePath).size,
