@@ -361,6 +361,15 @@ main.container {
   opacity: 0.9;
 }
 
+/* still loading, center our message */
+div.waveform-image {
+  text-align: center;
+  align-items: center;
+  flex-flow: wrap-reverse;
+  top: 30%;
+  position: relative;
+}
+
 .waveform-progress {
   position: absolute;
   top: 0;

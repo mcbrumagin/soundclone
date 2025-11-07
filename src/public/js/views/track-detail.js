@@ -39,19 +39,12 @@ export default class TrackDetailView {
       this.waveformProgress = (currentTime / duration) * 100
       this.currentTime = currentTime
 
-      console.warn('updateWaveformProgress', currentTime, duration, this.waveformProgress)
-      
       const progressElement = document.getElementById('waveformProgress')
-      // const seekerElement = document.getElementById('waveformSeeker')
       
       if (progressElement) {
         progressElement.style.width = `${this.waveformProgress}%`
       }
-      
-      // if (seekerElement && !seekerElement.dragging) {
-      //   seekerElement.value = currentTime
-      //   seekerElement.max = duration
-      // }
+
     } else console.warn('updateWaveformProgress: duration is 0', currentTime, duration)
   }
 
@@ -364,11 +357,12 @@ export default class TrackDetailView {
         }
       },
         // Show waveform image if available
+        console.log('track.waveformUrl', track.waveformUrl) || null,
         track.waveformUrl ? img({
           src: track.waveformUrl,
           alt: 'Waveform',
           class: 'waveform-image'
-        }) : div({ class: 'waveform-image' }, 'still processing waveform...'),
+        }) : div({ class: 'waveform-image' }, '...still processing waveform...'),
         // Only show progress if this is the currently playing track
         div({ 
           class: 'waveform-progress', 

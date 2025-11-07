@@ -4,7 +4,17 @@ import path from 'node:path'
 import { uploadsDir } from '../lib/utils.js'
 
 
-// NOTE this is not used anymore, but we may reimplement later for performance reasons
+// ---------------------------------------------------------
+// ---------------------------------------------------------
+// -------THIS IS DEPRECATED AND NOT USED ANYMORE-----------
+// ---------------------------------------------------------
+// ---------------------------------------------------------
+
+// but we may reimplement later for performance reasons idk
+// ---------------------------------------------------------
+// ---------------------------------------------------------
+// ---------------------------------------------------------
+
 
 
 /**
@@ -34,7 +44,7 @@ function getAudioContentType(filePath) {
  */
 export default async function audioStreamService(payload, request, response) {
   try {
-    if (payload) console.warn('audioStreamService payload:', payload)
+    if (payload) throw new HttpError(400, 'Bad request prolly')
     const { url } = request.url
 
     console.log('🎵 audioStreamService called:', {

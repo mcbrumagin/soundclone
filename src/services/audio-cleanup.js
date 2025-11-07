@@ -146,9 +146,11 @@ async function waitForProcessingComplete(message) {
       // Check if both files exist and are valid
       const transcodedCheck = verifyFile(transcodedFilePath, 'Transcoded file')
       const metadataCheck = verifyFile(metadataFilePath, 'Metadata file')
-      
+      const waveformCheck = verifyFile(waveformFilePath, 'Waveform file')
+
       if (transcodedCheck.exists && !transcodedCheck.error && 
-          metadataCheck.exists && !metadataCheck.error) {
+          metadataCheck.exists && !metadataCheck.error &&
+          waveformCheck.exists && !waveformCheck.error) {
         clearInterval(checkInterval)
         
         logger.info(`[${messageId}] Processing complete after ${elapsed}ms`)

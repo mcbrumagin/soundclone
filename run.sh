@@ -5,6 +5,10 @@ export ENVIRONMENT=dev
 export LOG_INCLUDE_LINES=true
 export LOG_EXCLUDE_FULL_PATH_IN_LOG_LINES=true
 
+export AWS_REGION=us-east-1
+export S3_BUCKET_NAME=soundclone-data
+export S3_PREFIX=soundclone/
+
 export ADMIN_USER=admin
 export ADMIN_SECRET=password
 

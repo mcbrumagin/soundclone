@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { uploadsDir, metadataDir } from '../lib/utils.js'
+import { publishMessage } from 'micro-js'
+import { uploadsDir, metadataDir, rawAudioDir, waveformsDir } from '../lib/utils.js'
 
 export default async function deleteTrack(payload, request) {
   try {
@@ -22,13 +23,54 @@ export default async function deleteTrack(payload, request) {
     }
     
     const trackData = JSON.parse(fs.readFileSync(trackPath, 'utf8'))
-    const filePath = path.join(uploadsDir, trackData.fileName)
     
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath)
+    // Collect all files to delete
+    const filesToDelete = []
+    
+    // Transcoded audio file (uploads)
+    const uploadPath = path.join(uploadsDir, trackData.fileName)
+    if (fs.existsSync(uploadPath)) {
+      filesToDelete.push(uploadPath)
     }
     
+    // Raw audio file
+    if (trackData.originalFileName) {
+      const rawPath = path.join(rawAudioDir, trackData.originalFileName)
+      if (fs.existsSync(rawPath)) {
+        filesToDelete.push(rawPath)
+      }
+    }
+    
+    // Waveform file
+    if (trackData.waveformFileName) {
+      const waveformPath = path.join(waveformsDir, trackData.waveformFileName)
+      if (fs.existsSync(waveformPath)) {
+        filesToDelete.push(waveformPath)
+      }
+    }
+    
+    // Delete all files and publish events
+    for (const filePath of filesToDelete) {
+      fs.unlinkSync(filePath)
+      console.log(`Deleted file: ${filePath}`)
+      
+      // Publish file-deleted event for S3 backup
+      await publishMessage('micro:file-deleted', {
+        filePath,
+        timestamp: new Date().toISOString()
+      })
+    }
+    
+    // Delete metadata file last
     fs.unlinkSync(trackPath)
+    console.log(`Deleted metadata: ${trackPath}`)
+    
+    // Publish metadata deletion event
+    await publishMessage('micro:file-deleted', {
+      filePath: trackPath,
+      timestamp: new Date().toISOString()
+    })
+    
     return { success: true, message: 'Track deleted successfully' }
   } catch (err) {
     console.error('deleteTrack service error:', err)

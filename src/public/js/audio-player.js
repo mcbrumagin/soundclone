@@ -51,14 +51,11 @@ class AudioPlayer {
     const needsNewTrack = !this.currentTrack || (track && this.currentTrack.id !== track.id)
     
     if (needsNewTrack) {
-      console.warn('loading new track', track)
       await this.loadTrack(track)
-    } else console.warn('no need to load new track', track)
+    }
     
     try {
-      console.warn('playing track at time', this.audio.currentTime)
       await this.audio.play()
-      console.log('Audio played')
       return true
     } catch (error) {
       console.error('Play failed:', error)
@@ -134,9 +131,7 @@ class AudioPlayer {
 
   seekTo(time) {
     if (this.audio && !isNaN(time) && isFinite(time) && time >= 0) {
-      console.warn('seekTo', time)
       this.audio.currentTime = time
-      console.warn('seekTo set currentTime', this.audio.currentTime)
     }
   }
 
@@ -144,7 +139,6 @@ class AudioPlayer {
     this.audio.addEventListener('timeupdate', data => {
       // console.log('timeupdate event', data)
       let { currentTime, duration } = this.audio
-      console.warn('timeupdate event', currentTime, duration)
       this.updateProgress({ currentTime, duration })
       
       // Update waveform progress if track detail view exists

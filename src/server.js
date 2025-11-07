@@ -11,6 +11,8 @@ import initializeMusicMetadataProcessor from './services/ffmpeg/music-meta.js'
 import initializeAudioTranscodeService from './services/ffmpeg/audio-transcode.js'
 import initializeAudioCleanupService from './services/audio-cleanup.js'
 import initializeWaveformGenerator from './services/ffmpeg/waveform-generator.js'
+import initializeLocalFileSystem from './services/s3-initialize.js'
+import initializeS3BackupService from './services/s3-backup.js'
 import createAuthService from 'micro-js/auth-service'
 import createStaticFileService from 'micro-js/static-file-service'
 import path from 'node:path'
@@ -46,12 +48,19 @@ async function startServer() {
     // start registry server first so services can register
     let registry = await registryServer()
     
+    // Initialize local filesystem from S3 FIRST (blocks static file service)
+    console.log('Initializing local filesystem from S3...')
+    await initializeLocalFileSystem()
+    console.log('Local filesystem initialization complete')
+    
     // wait for auth before we start upload service (requires it)
     let services = await Promise.all([
       createAuthService(),
-      initializeAudioCleanupService()
+      initializeAudioCleanupService(),
+      initializeS3BackupService() // Start backup service to listen for file events
     ])
 
+    // omit these on prod, they should be deployed separately
     if (!process.env.ENVIRONMENT?.includes('prod')) {
       console.warn('non-prod environment; initializing ffmpeg services')
       services = services.concat(await Promise.all([
@@ -63,8 +72,7 @@ async function startServer() {
 
     // register routes - order matters
     services = services.concat(await createRoutes({
-      '/health': function health() { return 'OK' },
-      // '/api/audio/*': audioStreamService,
+      '/health': getHealth,
       '/getTrackList': getTrackList,
       '/getTrackDetail': getTrackDetail,
       '/uploadTrack': await createTrackUploadService({
@@ -78,7 +86,6 @@ async function startServer() {
       '/updateComment': updateComment,
       '/deleteComment': deleteComment,
       '/getAudioMetadata': audioMetadataService,
-      '/getHealth': getHealth,
       '/*': await createStaticFileService({
         rootDir: path.join(__dirname, 'public'),
         urlRoot: '/',
