@@ -17,8 +17,8 @@ class AudioPlayer {
 
     // Support both fileName (uploaded files) and audioUrl (recorded audio)
     let audioSrc
-    if (track.fileName) {
-      audioSrc = `/api/audio/${track.fileName}`
+    if (track.transcodedFileName) {
+      audioSrc = `/api/audio/${track.transcodedFileName}`
     } else if (track.audioUrl) {
       audioSrc = track.audioUrl
     } else {

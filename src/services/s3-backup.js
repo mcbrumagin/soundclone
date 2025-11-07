@@ -1,17 +1,13 @@
 import { createService, createSubscriptionService, publishMessage } from 'micro-js'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import fs from 'node:fs/promises'
-import fsSync from 'node:fs'
 import path from 'node:path'
 
 import { envConfig } from 'micro-js'
 import { rawAudioDir, uploadsDir, metadataDir, waveformsDir } from '../lib/utils.js'
+import Logger from 'micro-js/logger'
 
-const logger = {
-  info: (...args) => console.log('[s3-backup]', ...args),
-  warn: (...args) => console.warn('[s3-backup]', ...args),
-  error: (...args) => console.error('[s3-backup]', ...args)
-}
+const logger = new Logger({ logGroup: 's3-backup' })
 
 // S3 configuration
 const s3Client = new S3Client({
@@ -62,15 +58,20 @@ function getS3Key(filePath) {
 /**
  * Upload file to S3
  */
-async function uploadFile(filePath) {
+async function uploadFile(filePath, rawData) {
   const s3Key = getS3Key(filePath)
   if (!s3Key) return false
   
   try {
     logger.info(`Uploading ${filePath} to s3://${BUCKET_NAME}/${s3Key}`)
     
-    // Read file
-    const fileContent = await fs.readFile(filePath)
+    let fileContent = null
+    if (!rawData) {
+      // Read file
+      fileContent = await fs.readFile(filePath)
+    } else {
+      fileContent = rawData
+    }
     
     // Determine content type
     const ext = path.extname(filePath).toLowerCase()
@@ -172,6 +173,27 @@ async function handleFileDeleted(message) {
 }
 
 /**
+ * Handle track-metadata-updated event
+ */
+async function handleTrackMetadataUpdated(message) {
+  const { trackId, metadata } = message
+  await uploadFile(path.join(metadataDir, `${trackId}.json`), JSON.stringify(metadata))
+  logger.info(`Updated metadata for track ${trackId} in S3`)
+  return true
+}
+
+/**
+ * Handle track-metadata-deleted event
+ */
+async function handleTrackMetadataDeleted(message) {
+  const { trackId } = message
+
+  await deleteFile(path.join(metadataDir, `${trackId}.json`))
+  logger.info(`Deleted metadata for track ${trackId} from S3`)
+  return true
+}
+
+/**
  * Initialize S3 backup service
  */
 export default async function initializeS3BackupService() {
@@ -198,7 +220,9 @@ export default async function initializeS3BackupService() {
   // Subscribe to file events
   let s3BackupService = await createSubscriptionService('s3-backup', {
     'micro:file-updated': handleFileUpdated,
-    'micro:file-deleted': handleFileDeleted
+    'micro:file-deleted': handleFileDeleted,
+    'track-metadata-updated': handleTrackMetadataUpdated,
+    'track-metadata-deleted': handleTrackMetadataDeleted
   })
   
   logger.info('✅ S3 backup service initialized')

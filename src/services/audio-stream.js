@@ -1,5 +1,5 @@
 import { next, HttpError } from 'micro-js'
-import fs from 'node:fs'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import { uploadsDir } from '../lib/utils.js'
 
@@ -78,12 +78,10 @@ export default async function audioStreamService(payload, request, response) {
     const audioFilePath = path.join(uploadsDir, fileName)
     
     // Check if file exists
-    if (!fs.existsSync(audioFilePath)) {
-      throw new HttpError(404, 'Audio file not found - may still be processing')
-    }
+    await fs.access(audioFilePath, fs.constants.F_OK)
     
     const contentType = getAudioContentType(audioFilePath)
-    const stat = fs.statSync(audioFilePath)
+    const stat = await fs.stat(audioFilePath)
     
     // Check if file is empty or still being written
     if (stat.size === 0) {

@@ -179,8 +179,8 @@ export const getAudioUrl = trackId => {
 }
 
 // Audio metadata
-export const getAudioMetadata = async (fileName) => {
-  const json = await callService('audioMetadataService', { fileName })
+export const getTrackMetadata = async (trackId) => {
+  const json = await callService('getTrackMetadata', { trackId })
   return json
 }
 

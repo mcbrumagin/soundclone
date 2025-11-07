@@ -1,6 +1,4 @@
-import fs from 'node:fs'
-import path from 'node:path'
-import { metadataDir } from '../lib/utils.js'
+import { getAllTrackMetadata } from '../lib/metadata-cache.js'
 
 export default async function getTrackList(payload, request, response) {
   try {
@@ -8,21 +6,10 @@ export default async function getTrackList(payload, request, response) {
     let remoteIp = request.socket.remoteAddress
     let senderIp = request.headers['x-forwarded-for']
     console.log('remote and sender ip:', remoteIp, senderIp)
-    // console.log('request headers:', request.headers)
-    // response.setHeader('forwarded', request.headers.forwarded)
-    // response.setHeader('Cache-Control', 'max-age=60, public')
-    // response.setHeader('x-test-header', 'test value')
-    const files = fs.readdirSync(metadataDir)
-    const tracks = []
     
-    files.forEach(file => {
-      if (file.endsWith('.json')) {
-        const trackData = JSON.parse(fs.readFileSync(path.join(metadataDir, file), 'utf8'))
-        tracks.push(trackData)
-      }
-    })
+    // Get all tracks from cache (already sorted)
+    const tracks = await getAllTrackMetadata()
     
-    tracks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     return { success: true, tracks }
   } catch (err) {
     console.error('getTrackList service error:', err)

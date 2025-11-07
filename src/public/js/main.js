@@ -164,17 +164,17 @@ const bootstrap = async () => {
   }
 
   // Start polling for new tracks
-  trackPollingService.start((newTracks) => {
-    // Only update if tracks actually changed
-    const hasChanges = newTracks.length !== appState.tracks.length ||
-      !newTracks.every((track, i) => track.id === appState.tracks[i]?.id)
+  // trackPollingService.start((newTracks) => {
+  //   // Only update if tracks actually changed
+  //   const hasChanges = newTracks.length !== appState.tracks.length ||
+  //     !newTracks.every((track, i) => track.id === appState.tracks[i]?.id)
     
-    if (hasChanges) {
-      console.log('Updating tracks from polling service')
-      appState.tracks = newTracks
-      window.renderApp()
-    }
-  })
+  //   if (hasChanges) {
+  //     console.log('Updating tracks from polling service')
+  //     appState.tracks = newTracks
+  //     window.renderApp()
+  //   }
+  // })
 }
 
 bootstrap() 

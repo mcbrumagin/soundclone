@@ -81,7 +81,8 @@ export default class UploadView {
       this.uploadStatus = 'Processing audio (transcoding & metadata extraction)...'
       window.renderApp()
       
-      await this.pollForCompletion(response.id)
+      // TODO?
+      // await this.pollForCompletion(response.id)
       
       // Notify polling service to reset backoff and check immediately
       if (appState.trackPollingService) {

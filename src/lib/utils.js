@@ -22,9 +22,6 @@ export function ensureDataDirectories() {
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir)
   }
-  if (!fs.existsSync(metadataDir)) {
-    fs.mkdirSync(metadataDir)
-  }
   if (!fs.existsSync(waveformsDir)) {
     fs.mkdirSync(waveformsDir)
   }

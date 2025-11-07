@@ -4,7 +4,10 @@ import {
   createService,
   callService,
   overrideConsoleGlobally,
-  HttpError
+  HttpError,
+  createCacheService,
+  publishMessage,
+  Logger
 } from 'micro-js'
 
 import initializeMusicMetadataProcessor from './services/ffmpeg/music-meta.js'
@@ -28,8 +31,10 @@ import deleteTrack from './services/track-delete.js'
 import createComment from './services/comment-create.js'
 import updateComment from './services/comment-update.js'
 import deleteComment from './services/comment-delete.js'
-import audioMetadataService from './services/audio-metadata.js'
+import getTrackMetadataFromCache from './services/audio-metadata.js'
 import getHealth from './services/health.js'
+
+const logger = new Logger({ logGroup: 'server' })
 
 overrideConsoleGlobally({
   includeLogLineNumbers: true
@@ -48,27 +53,38 @@ async function startServer() {
     // start registry server first so services can register
     let registry = await registryServer()
     
+    // Create cache service for metadata (in-memory, no eviction)
+    logger.info('creating metadata cache service...')
+    const cacheService = await createCacheService({
+      cacheName: 'track-metadata',
+      evictionInterval: 'None', // No automatic eviction
+      expireTime: 60 * 60 * 1000 // 1 hour
+    })
+    logger.info('metadata cache service created')
+    
     // Initialize local filesystem from S3 FIRST (blocks static file service)
-    console.log('Initializing local filesystem from S3...')
+    // This will load metadata into the cache
+    logger.info('initializing local filesystem from S3...')
     await initializeLocalFileSystem()
-    console.log('Local filesystem initialization complete')
+    logger.info('local filesystem initialization complete')
     
     // wait for auth before we start upload service (requires it)
-    let services = await Promise.all([
+    let services = [cacheService]
+    services = services.concat(await Promise.all([
       createAuthService(),
       initializeAudioCleanupService(),
       initializeS3BackupService() // Start backup service to listen for file events
-    ])
+    ]))
 
     // omit these on prod, they should be deployed separately
     if (!process.env.ENVIRONMENT?.includes('prod')) {
-      console.warn('non-prod environment; initializing ffmpeg services')
+      logger.warn('non-prod environment; initializing ffmpeg services')
       services = services.concat(await Promise.all([
         initializeMusicMetadataProcessor(),
         initializeAudioTranscodeService(),
         initializeWaveformGenerator(),
       ]))
-    } else console.warn('prod environment; ffmpeg services should run separately')
+    } else logger.warn('prod environment; ffmpeg services should run separately')
 
     // register routes - order matters
     services = services.concat(await createRoutes({
@@ -85,7 +101,7 @@ async function startServer() {
       '/createComment': createComment,
       '/updateComment': updateComment,
       '/deleteComment': deleteComment,
-      '/getAudioMetadata': audioMetadataService,
+      '/getTrackMetadata': getTrackMetadataFromCache,
       '/*': await createStaticFileService({
         rootDir: path.join(__dirname, 'public'),
         urlRoot: '/',
@@ -106,9 +122,29 @@ async function startServer() {
         }
       })
     }))
+
+    // ALB healthcheck simulator
+    if (process.env.ENVIRONMENT?.includes('dev')) setInterval(async () => {
+      try {
+        let result =await callService('getHealth')
+        logger.debug('healthcheck simulator passed: ', result)
+      } catch (error) {
+        logger.error('healthcheck simulator failed: ', error)
+      }
+    }, 1000)
+
+    // logger.info('publishing test message to processUploadedAudio')
+    // await publishMessage('processUploadedAudio', {
+    //   messageId: 'test-123',
+    //   trackId: 'test-123',
+    //   originalFilePath: 'data/rawAudio/3minute-vox-plus-harmonies-03ae9dd2.mp3',
+    //   transcodedFilePath: 'data/uploads/3minute-vox-plus-harmonies-03ae9dd2.webm',
+    //   waveformFilePath: 'data/waveforms/3minute-vox-plus-harmonies-03ae9dd2.png',
+    //   timestamp: new Date().toISOString()
+    // })
     
-    console.log(`🔧 Registered services:\n  - ${services.map(service => service?.name).join('\n  - ')}`)
-    console.log(`SoundClone v0 server running on http://localhost:${PORT}`)
+    logger.info(`🔧 Registered services:\n  - ${services.map(service => service?.name).join('\n  - ')}`)
+    logger.info(`SoundClone v0 server running on http://localhost:${PORT}`)
 
     // TODO shutdown helper in registry that calls terminate on all services then kills itself
     // services will need to be aware of any same host neighbors on same MICRO_SERVICE_URL, they will need to kill themselves too
@@ -117,12 +153,12 @@ async function startServer() {
       if (isTerminating) return
       isTerminating = true
 
-      console.log(`${signal} received, terminating server...`)
+      logger.warn(`${signal} received, terminating server...`)
 
       await Promise.all(services.map(service => service?.terminate?.()))
       await registry.terminate()
 
-      console.log('Server terminated')
+      logger.info('server terminated gracefully')
       process.exit(0)
     }
 
@@ -131,7 +167,7 @@ async function startServer() {
     process.on('SIGINT', () => gracefulShutdown('SIGINT'))
     
   } catch (error) {
-    console.error('Failed to start server:', error)
+    logger.error('failed to start server:', error)
     process.exit(1)
   }
 }

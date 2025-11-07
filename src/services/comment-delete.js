@@ -1,6 +1,4 @@
-import fs from 'node:fs'
-import path from 'node:path'
-import { metadataDir } from '../lib/utils.js'
+import { getTrackMetadata, mergeAndUpdateTrackMetadata } from '../lib/metadata-cache.js'
 
 export default async function deleteComment(payload, request) {
   try {
@@ -13,15 +11,14 @@ export default async function deleteComment(payload, request) {
       throw error
     }
     
-    const trackPath = path.join(metadataDir, `${trackId}.json`)
+    const trackData = await getTrackMetadata(trackId)
     
-    if (!fs.existsSync(trackPath)) {
+    if (!trackData) {
       const error = new Error('Track not found')
       error.status = 404
       throw error
     }
     
-    const trackData = JSON.parse(fs.readFileSync(trackPath, 'utf8'))
     const commentIndex = trackData.comments.findIndex(c => c.id === commentId)
     
     if (commentIndex === -1) {
@@ -30,10 +27,12 @@ export default async function deleteComment(payload, request) {
       throw error
     }
     
-    trackData.comments.splice(commentIndex, 1)
-    trackData.updatedAt = new Date().toISOString()
+    // Remove comment from array
+    const updatedComments = trackData.comments.filter(c => c.id !== commentId)
     
-    fs.writeFileSync(trackPath, JSON.stringify(trackData, null, 2))
+    // Merge into cache
+    await mergeAndUpdateTrackMetadata(trackId, { comments: updatedComments })
+    
     return { success: true, message: 'Comment deleted successfully' }
   } catch (err) {
     console.error('deleteComment service error:', err)

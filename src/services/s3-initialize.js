@@ -1,18 +1,17 @@
 import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3'
 import fs from 'node:fs/promises'
-import fsSync from 'node:fs'
+import { createWriteStream } from 'node:fs'
 import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 
-import { rawAudioDir, uploadsDir, metadataDir, waveformsDir } from '../lib/utils.js'
+import { rawAudioDir, uploadsDir, waveformsDir } from '../lib/utils.js'
 import { envConfig } from 'micro-js'
+import { setTrackMetadata } from '../lib/metadata-cache.js'
+import { ensureDir, getFileSize } from '../lib/fs-helpers.js'
+import Logger from 'micro-js/logger'
 
-const logger = {
-  info: (...args) => console.log('[s3-initialize]', ...args),
-  warn: (...args) => console.warn('[s3-initialize]', ...args),
-  error: (...args) => console.error('[s3-initialize]', ...args)
-}
+const logger = new Logger({ logGroup: 's3-initialize' })
 
 // S3 configuration
 const s3Client = new S3Client({
@@ -26,9 +25,8 @@ const s3Client = new S3Client({
 const BUCKET_NAME = envConfig.getRequired('S3_BUCKET_NAME')
 const S3_PREFIX = envConfig.get('S3_PREFIX') || 'soundclone/'
 
-// Directory mappings
+// Directory mappings (metadata handled separately via cache)
 const DIRECTORIES = {
-  metadata: metadataDir,
   rawAudio: rawAudioDir,
   uploads: uploadsDir,
   waveforms: waveformsDir
@@ -49,14 +47,11 @@ async function downloadFile(s3Key, localPath) {
     const response = await s3Client.send(command)
     
     // Ensure directory exists
-    const dir = path.dirname(localPath)
-    if (!fsSync.existsSync(dir)) {
-      await fs.mkdir(dir, { recursive: true })
-    }
+    await ensureDir(path.dirname(localPath))
     
     // Stream the file to disk
     if (response.Body instanceof Readable) {
-      const writeStream = fsSync.createWriteStream(localPath)
+      const writeStream = createWriteStream(localPath)
       await pipeline(response.Body, writeStream)
       logger.info(`Downloaded ${s3Key}`)
       return true
@@ -103,13 +98,11 @@ async function syncDirectory(dirType, s3Prefix, localDir) {
       const localPath = path.join(localDir, filename)
       
       // Skip if file already exists and has same size
-      if (fsSync.existsSync(localPath)) {
-        const stat = await fs.stat(localPath)
-        if (stat.size === object.Size) {
-          logger.info(`Skipping ${filename} (already exists with correct size)`)
-          successCount++
-          continue
-        }
+      const existingSize = await getFileSize(localPath)
+      if (existingSize === object.Size && existingSize > 0) {
+        logger.info(`Skipping ${filename} (already exists with correct size)`)
+        successCount++
+        continue
       }
       
       const success = await downloadFile(object.Key, localPath)
@@ -134,6 +127,84 @@ async function syncDirectory(dirType, s3Prefix, localDir) {
 }
 
 /**
+ * Load metadata from S3 into cache (instead of filesystem)
+ */
+async function syncMetadataToCache() {
+  try {
+    logger.info('Loading metadata from S3 into cache...')
+    
+    const s3Prefix = `${S3_PREFIX}metadata/`
+    const command = new ListObjectsV2Command({
+      Bucket: BUCKET_NAME,
+      Prefix: s3Prefix
+    })
+    
+    const response = await s3Client.send(command)
+    const contents = response.Contents || []
+    
+    if (contents.length === 0) {
+      logger.info('No metadata files found in S3')
+      return { success: true, count: 0 }
+    }
+    
+    logger.info(`Found ${contents.length} metadata files in S3`)
+    
+    let successCount = 0
+    let failCount = 0
+    
+    for (const object of contents) {
+      // Skip directory markers
+      if (object.Key.endsWith('/')) continue
+      
+      try {
+        // Download metadata content
+        const getCommand = new GetObjectCommand({
+          Bucket: BUCKET_NAME,
+          Key: object.Key
+        })
+        
+        const getResponse = await s3Client.send(getCommand)
+        
+        // Read the stream
+        const chunks = []
+        for await (const chunk of getResponse.Body) {
+          chunks.push(chunk)
+        }
+        const content = Buffer.concat(chunks).toString('utf-8')
+        
+        // Parse and store in cache
+        const metadata = JSON.parse(content)
+        const trackId = metadata.id
+        
+        if (trackId) {
+          await setTrackMetadata(trackId, metadata)
+          logger.debug('syncMetadataToCache - metadata set:', { trackId, metadata })
+          logger.info(`loaded metadata for track "${trackId}" into cache`)
+          successCount++
+        } else {
+          logger.warn(`syncMetadataToCache - metadata file "${object.Key}" has no id field`)
+          failCount++
+        }
+      } catch (error) {
+        logger.error(`Failed to load metadata from ${object.Key}:`, error.message)
+        failCount++
+      }
+    }
+    
+    logger.info(`metadata sync complete: ${successCount} success, ${failCount} failed`)
+    
+    return {
+      success: failCount === 0,
+      count: successCount,
+      failed: failCount
+    }
+  } catch (error) {
+    logger.error('Failed to sync metadata to cache:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
  * Initialize local filesystem from S3
  */
 async function initializeFromS3() {
@@ -152,7 +223,10 @@ async function initializeFromS3() {
   
   const results = {}
   
-  // Sync each directory
+  // Sync metadata to cache first
+  results.metadata = await syncMetadataToCache()
+  
+  // Sync file directories
   for (const [dirType, localDir] of Object.entries(DIRECTORIES)) {
     const s3Prefix = `${S3_PREFIX}${dirType}/`
     results[dirType] = await syncDirectory(dirType, s3Prefix, localDir)
@@ -165,7 +239,8 @@ async function initializeFromS3() {
     logger.error('S3 initialization completed with errors:', results)
     return { success: false, results }
   } else {
-    logger.info('S3 initialization completed successfully:', results)
+    logger.info('S3 initialization completed successfully')
+    logger.debug('S3 initialization results:', results)
     return { success: true, results }
   }
 }

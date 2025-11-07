@@ -1,6 +1,4 @@
-import fs from 'node:fs'
-import path from 'node:path'
-import { metadataDir } from '../lib/utils.js'
+import { getTrackMetadata } from '../lib/metadata-cache.js'
 
 export default async function getTrackDetail(payload, request) {
   try {
@@ -13,15 +11,14 @@ export default async function getTrackDetail(payload, request) {
       throw error
     }
     
-    const trackPath = path.join(metadataDir, `${trackId}.json`)
+    const trackData = await getTrackMetadata(trackId)
     
-    if (!fs.existsSync(trackPath)) {
+    if (!trackData) {
       const error = new Error('Track not found')
       error.status = 404
       throw error
     }
     
-    const trackData = JSON.parse(fs.readFileSync(trackPath, 'utf8'))
     return { success: true, track: trackData }
   } catch (err) {
     console.error('getTrackDetail service error:', err)

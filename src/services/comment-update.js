@@ -1,13 +1,11 @@
-import fs from 'node:fs'
-import path from 'node:path'
-import { metadataDir } from '../lib/utils.js'
+import { getTrackMetadata, mergeAndUpdateTrackMetadata } from '../lib/metadata-cache.js'
 
 function parseCommentTimestamp(text) {
   const hasTimestamp = text.includes('@')
   let trackTimestamp = null
   
   if (hasTimestamp) {
-    const match = text.match(/@(\d{2}):(\d{2})/)
+    const match = text.match(/@(\d{1,2}):(\d{2})/)
     if (match) {
       const minutes = parseInt(match[1])
       const seconds = parseInt(match[2])
@@ -29,15 +27,20 @@ export default async function updateComment(payload, request) {
       throw error
     }
     
-    const trackPath = path.join(metadataDir, `${trackId}.json`)
+    if (!text) {
+      const error = new Error('Comment text is required')
+      error.status = 400
+      throw error
+    }
     
-    if (!fs.existsSync(trackPath)) {
+    const trackData = await getTrackMetadata(trackId)
+    
+    if (!trackData) {
       const error = new Error('Track not found')
       error.status = 404
       throw error
     }
     
-    const trackData = JSON.parse(fs.readFileSync(trackPath, 'utf8'))
     const commentIndex = trackData.comments.findIndex(c => c.id === commentId)
     
     if (commentIndex === -1) {
@@ -46,23 +49,22 @@ export default async function updateComment(payload, request) {
       throw error
     }
     
-    if (!text) {
-      const error = new Error('Comment text is required')
-      error.status = 400
-      throw error
-    }
-    
     const { hasTimestamp, trackTimestamp } = parseCommentTimestamp(text)
     
-    trackData.comments[commentIndex].text = text
-    trackData.comments[commentIndex].updatedAt = new Date().toISOString()
-    trackData.comments[commentIndex].hasTimestamp = hasTimestamp
-    trackData.comments[commentIndex].trackTimestamp = trackTimestamp
+    // Update comment in array
+    const updatedComments = [...trackData.comments]
+    updatedComments[commentIndex] = {
+      ...updatedComments[commentIndex],
+      text,
+      updatedAt: new Date().toISOString(),
+      hasTimestamp,
+      trackTimestamp
+    }
     
-    trackData.updatedAt = new Date().toISOString()
+    // Merge into cache
+    await mergeAndUpdateTrackMetadata(trackId, { comments: updatedComments })
     
-    fs.writeFileSync(trackPath, JSON.stringify(trackData, null, 2))
-    return { success: true, comment: trackData.comments[commentIndex] }
+    return { success: true, comment: updatedComments[commentIndex] }
   } catch (err) {
     console.error('updateComment service error:', err)
     if (err.status) throw err

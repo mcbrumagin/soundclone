@@ -1,14 +1,12 @@
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import fsSync from 'node:fs'
 import { spawn } from 'node:child_process'
 import { createSubscriptionService, publishMessage } from 'micro-js'
+import { mergeAndUpdateTrackMetadata } from '../../lib/metadata-cache.js'
 import Logger from 'micro-js/logger'
+import { waitFor } from '../../lib/async-helpers.js'
 
 const logger = new Logger({ logGroup: 'music-meta' })
-
-const metadataDir = path.join(process.cwd(), 'data','metadata')
-const rawAudioDir = path.join(process.cwd(), 'data', 'rawAudio')
 
 /**
  * Get comprehensive audio metadata using ffprobe
@@ -78,52 +76,33 @@ async function getAudioMetadata(filePath) {
 }
 
 async function processAudioMetadata(message) {
-  const { messageId, trackId, originalFilePath, metadataFilePath } = message
+  const { messageId, trackId, originalFilePath } = message
   
   logger.info(`[${messageId}] Processing metadata for track ${trackId}`)
   
   try {
-    // Check if input file exists
-    if (!fsSync.existsSync(originalFilePath)) {
-      throw new Error(`Original file not found: ${originalFilePath}`)
-    }
+    // Check if original file exists
+    await waitFor(30000, 1000, async () => {
+      await fs.access(originalFilePath, fs.constants.F_OK)
+      return true
+    }, 'Original file not found after 30 seconds')
     
-    // Read existing metadata file created during upload
-    let existingMetadata = {}
-    if (fsSync.existsSync(metadataFilePath)) {
-      const content = await fs.readFile(metadataFilePath, 'utf-8')
-      existingMetadata = JSON.parse(content)
-      logger.debug(`[${messageId}] Loaded existing metadata from ${metadataFilePath}`)
-    }
+    // Extract audio metadata from original file using ffprobe
+    const originalFileMetadata = await getAudioMetadata(originalFilePath)
     
-    // Extract audio metadata using ffprobe
-    const extractedMetadata = await getAudioMetadata(originalFilePath)
-    
-    if (!extractedMetadata) {
+    if (!originalFileMetadata) {
       throw new Error('Failed to extract audio metadata with ffprobe')
     }
     
-    logger.info(`[${messageId}] Audio metadata extracted:`, {
-      duration: extractedMetadata.duration,
-      bitrate: extractedMetadata.bitrate,
-      sampleRate: extractedMetadata.sampleRate,
-      channels: extractedMetadata.channels,
-      codec: extractedMetadata.codec,
-      hasID3: !!(extractedMetadata.artist || extractedMetadata.title)
+    logger.info(`[${messageId}] Audio metadata extracted:`, { originalFileMetadata })
+    
+    // Merge extracted metadata into cache
+    await mergeAndUpdateTrackMetadata(trackId, {
+      originalFileMetadata,
+      duration: originalFileMetadata.duration || 0
     })
-    
-    // Merge extracted metadata with existing metadata
-    const mergedMetadata = {
-      ...existingMetadata,
-      ...extractedMetadata,
-      // Keep original title from upload if no ID3 title
-      title: extractedMetadata.title || existingMetadata.title,
-      updatedAt: new Date().toISOString()
-    }
-    
-    // Write merged metadata back to file
-    await fs.writeFile(metadataFilePath, JSON.stringify(mergedMetadata, null, 2))
-    logger.info(`[${messageId}] Metadata written to: ${metadataFilePath}`)
+
+    logger.info(`[${messageId}] Metadata written to cache`)
     
     // Publish success event
     await publishMessage('audioMetadataComplete', {
@@ -131,17 +110,6 @@ async function processAudioMetadata(message) {
       trackId,
       metadataFilePath,
       metadata: extractedMetadata,
-      timestamp: new Date().toISOString()
-    })
-
-    logger.warn('publishing event for static file service')
-    await publishMessage('micro:file-updated', {
-      urlPath: `/api/metadata/${path.basename(metadataFilePath)}`,
-      filePath: metadataFilePath,
-      size: fsSync.statSync(metadataFilePath).size,
-      mimeType: 'application/json',
-      originalName: path.basename(metadataFilePath),
-      savedName: path.basename(metadataFilePath),
       timestamp: new Date().toISOString()
     })
     
@@ -152,7 +120,7 @@ async function processAudioMetadata(message) {
     await publishMessage('audioProcessingFailed', {
       messageId,
       trackId,
-      service: 'audio-metadata',
+      service: 'music-meta',
       error: error.message,
       timestamp: new Date().toISOString()
     })

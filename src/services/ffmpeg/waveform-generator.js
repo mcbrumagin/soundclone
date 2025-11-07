@@ -1,18 +1,13 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
-import fsSync from 'node:fs'
 import path from 'node:path'
 import { createSubscriptionService, publishMessage } from 'micro-js'
+import { mergeAndUpdateTrackMetadata } from '../../lib/metadata-cache.js'
 import Logger from 'micro-js/logger'
 
 const logger = new Logger({ logGroup: 'waveform-generator' })
 
 const waveformsDir = path.join(process.cwd(), 'data', 'waveforms')
-
-// Ensure waveforms directory exists
-if (!fsSync.existsSync(waveformsDir)) {
-  fsSync.mkdirSync(waveformsDir, { recursive: true })
-}
 
 /**
  * Generate waveform PNG image using FFmpeg
@@ -46,7 +41,7 @@ async function generateWaveform(audioFilePath, outputPath, options = {}) {
       stderr += data.toString()
     })
     
-    ffmpeg.on('close', (code) => {
+    ffmpeg.on('close', async (code) => {
       if (code !== 0) {
         logger.error(`Waveform generation failed with code ${code}:`, stderr)
         resolve({ 
@@ -58,7 +53,9 @@ async function generateWaveform(audioFilePath, outputPath, options = {}) {
       }
       
       // Verify output file exists
-      if (!fsSync.existsSync(outputPath)) {
+      try {
+        await fs.access(outputPath, fs.constants.F_OK)
+      } catch (err) {
         resolve({ 
           success: false, 
           error: 'Waveform file was not created' 
@@ -66,7 +63,7 @@ async function generateWaveform(audioFilePath, outputPath, options = {}) {
         return
       }
       
-      const stat = fsSync.statSync(outputPath)
+      const stat = await fs.stat(outputPath)
       if (stat.size === 0) {
         resolve({ 
           success: false, 
@@ -91,26 +88,19 @@ async function generateWaveform(audioFilePath, outputPath, options = {}) {
 
 /**
  * Update track metadata with waveform URL
- * @param {string} metadataFilePath - Path to metadata JSON
  * @param {string} waveformFileName - Waveform filename
  */
-async function updateMetadataWithWaveform(metadataFilePath, waveformFileName) {
+async function updateMetadataWithWaveform(trackId, waveformFileName) {
   try {
-    if (!fsSync.existsSync(metadataFilePath)) {
-      logger.warn(`Metadata file not found: ${metadataFilePath}`)
-      return
-    }
+    await mergeAndUpdateTrackMetadata(trackId, {
+      updatedAt: new Date().toISOString(),
+      waveformFileName: waveformFileName
+    })
     
-    const content = await fs.readFile(metadataFilePath, 'utf-8')
-    const metadata = JSON.parse(content)
-    
-    metadata.waveformUrl = `/api/waveforms/${waveformFileName}`
-    metadata.updatedAt = new Date().toISOString()
-    
-    await fs.writeFile(metadataFilePath, JSON.stringify(metadata, null, 2))
     logger.info(`Updated metadata with waveform URL: ${waveformFileName}`)
   } catch (err) {
     logger.error('Failed to update metadata with waveform:', err)
+    throw err
   }
 }
 
@@ -119,15 +109,13 @@ async function updateMetadataWithWaveform(metadataFilePath, waveformFileName) {
  * @param {Object} message - Message from pubsub
  */
 async function processWaveformGeneration(message) {
-  const { messageId, trackId, transcodedFilePath } = message
+  const { messageId, trackId, transcodedFilePath, waveformFilePath } = message
   
   logger.info(`[${messageId}] Generating waveform for track ${trackId}`)
   
   try {
     // Check if transcoded file exists
-    if (!fsSync.existsSync(transcodedFilePath)) {
-      throw new Error(`Transcoded file not found: ${transcodedFilePath}`)
-    }
+    await fs.access(transcodedFilePath, fs.constants.F_OK)
     
     // Generate waveform filename (matches transcoded file basename)
     const baseName = path.basename(transcodedFilePath, path.extname(transcodedFilePath))
@@ -141,10 +129,7 @@ async function processWaveformGeneration(message) {
       throw new Error(result.error || 'Waveform generation failed')
     }
     
-    // Try to update metadata (derive path from message if available)
-    if (message.metadataFilePath) {
-      await updateMetadataWithWaveform(message.metadataFilePath, waveformFileName)
-    }
+    await updateMetadataWithWaveform(trackId, waveformFileName)
     
     logger.info(`[${messageId}] Waveform generation complete`)
     
@@ -161,7 +146,7 @@ async function processWaveformGeneration(message) {
     await publishMessage('micro:file-updated', {
       urlPath: `/api/waveforms/${waveformFileName}`,
       filePath: waveformPath,
-      size: fsSync.statSync(waveformPath).size,
+      size: (await fs.stat(waveformPath)).size,
       mimeType: 'image/png',
       originalName: waveformFileName,
       savedName: waveformFileName,
@@ -180,6 +165,10 @@ async function processWaveformGeneration(message) {
  */
 export default async function initializeWaveformGenerator() {
   logger.info('Initializing waveform generator service')
+
+  // Ensure waveforms directory exists
+  await fs.access(waveformsDir, fs.constants.F_OK)
+  await fs.mkdir(waveformsDir, { recursive: true })
   
   // Subscribe to transcode completion events
   let waveformService = await createSubscriptionService('waveform-generator', 'audioTranscodeComplete', async (message) => {

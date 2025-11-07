@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
-import fsSync from 'node:fs'
 import path from 'node:path'
 import { createSubscriptionService, publishMessage } from 'micro-js'
 import Logger from 'micro-js/logger'
@@ -91,7 +90,7 @@ async function transcodeToOpus(inputPath, outputPath) {
       stderr += data.toString()
     })
     
-    ffmpeg.on('close', (code) => {
+    ffmpeg.on('close', async (code) => {
       if (code !== 0) {
         logger.error(`Transcode failed with code ${code}:`, stderr)
         resolve({ 
@@ -103,7 +102,9 @@ async function transcodeToOpus(inputPath, outputPath) {
       }
       
       // Verify output file exists and has content
-      if (!fsSync.existsSync(outputPath)) {
+      try  {
+        await fs.access(outputPath, fs.constants.F_OK)
+      } catch (err) {
         resolve({ 
           success: false, 
           error: 'Output file was not created' 
@@ -111,7 +112,7 @@ async function transcodeToOpus(inputPath, outputPath) {
         return
       }
       
-      const stat = fsSync.statSync(outputPath)
+      const stat = await fs.stat(outputPath)
       if (stat.size === 0) {
         resolve({ 
           success: false, 
@@ -139,15 +140,13 @@ async function transcodeToOpus(inputPath, outputPath) {
  * @param {Object} message - Message from pubsub
  */
 async function processAudioTranscode(message) {
-  const { messageId, trackId, originalFilePath, transcodedFilePath, metadataFilePath } = message
+  const { messageId, trackId, originalFilePath, transcodedFilePath, waveformFilePath } = message
   
   logger.info(`[${messageId}] Processing transcode for track ${trackId}`)
   
   try {
     // Check if input file exists
-    if (!fsSync.existsSync(originalFilePath)) {
-      throw new Error(`Original file not found: ${originalFilePath}`)
-    }
+    await fs.access(originalFilePath, fs.constants.F_OK)
     
     // Check if already high-quality Opus
     const alreadyOpus = await isHighQualityOpus(originalFilePath)
@@ -155,7 +154,7 @@ async function processAudioTranscode(message) {
     let result
     if (alreadyOpus) {
       logger.info(`[${messageId}] File already high-quality Opus, copying to final location`)
-      await fs.copyFile(originalFilePath, transcodedFilePath)
+      await fs.cp(originalFilePath, transcodedFilePath)
       result = { success: true }
     } else {
       logger.info(`[${messageId}] Transcoding to Opus (WebM container)`)
@@ -168,7 +167,7 @@ async function processAudioTranscode(message) {
         messageId,
         trackId,
         transcodedFilePath,
-        metadataFilePath, // Pass through for waveform generator
+        waveformFilePath, // Pass through for waveform generator
         timestamp: new Date().toISOString()
       })
 
@@ -176,7 +175,7 @@ async function processAudioTranscode(message) {
       await publishMessage('micro:file-updated', {
         urlPath: `/api/audio/${path.basename(transcodedFilePath)}`,
         filePath: transcodedFilePath,
-        size: fsSync.statSync(transcodedFilePath).size,
+        size: (await fs.stat(transcodedFilePath)).size,
         mimeType: 'audio/webm',
         originalName: path.basename(transcodedFilePath),
         savedName: path.basename(transcodedFilePath),

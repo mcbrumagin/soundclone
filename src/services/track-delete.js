@@ -1,7 +1,8 @@
-import fs from 'node:fs'
 import path from 'node:path'
 import { publishMessage } from 'micro-js'
-import { uploadsDir, metadataDir, rawAudioDir, waveformsDir } from '../lib/utils.js'
+import { uploadsDir, rawAudioDir, waveformsDir } from '../lib/utils.js'
+import { getTrackMetadata, deleteTrackMetadata } from '../lib/metadata-cache.js'
+import { fileExists, deleteFiles } from '../lib/fs-helpers.js'
 
 export default async function deleteTrack(payload, request) {
   try {
@@ -14,29 +15,27 @@ export default async function deleteTrack(payload, request) {
       throw error
     }
     
-    const trackPath = path.join(metadataDir, `${trackId}.json`)
+    const trackData = await getTrackMetadata(trackId)
     
-    if (!fs.existsSync(trackPath)) {
+    if (!trackData) {
       const error = new Error('Track not found')
       error.status = 404
       throw error
     }
     
-    const trackData = JSON.parse(fs.readFileSync(trackPath, 'utf8'))
-    
     // Collect all files to delete
     const filesToDelete = []
     
     // Transcoded audio file (uploads)
-    const uploadPath = path.join(uploadsDir, trackData.fileName)
-    if (fs.existsSync(uploadPath)) {
+    const uploadPath = path.join(uploadsDir, trackData.transcodedFileName)
+    if (await fileExists(uploadPath)) {
       filesToDelete.push(uploadPath)
     }
     
     // Raw audio file
     if (trackData.originalFileName) {
       const rawPath = path.join(rawAudioDir, trackData.originalFileName)
-      if (fs.existsSync(rawPath)) {
+      if (await fileExists(rawPath)) {
         filesToDelete.push(rawPath)
       }
     }
@@ -44,14 +43,13 @@ export default async function deleteTrack(payload, request) {
     // Waveform file
     if (trackData.waveformFileName) {
       const waveformPath = path.join(waveformsDir, trackData.waveformFileName)
-      if (fs.existsSync(waveformPath)) {
+      if (await fileExists(waveformPath)) {
         filesToDelete.push(waveformPath)
       }
     }
     
     // Delete all files and publish events
-    for (const filePath of filesToDelete) {
-      fs.unlinkSync(filePath)
+    const deleteResult = await deleteFiles(filesToDelete, async (filePath) => {
       console.log(`Deleted file: ${filePath}`)
       
       // Publish file-deleted event for S3 backup
@@ -59,15 +57,15 @@ export default async function deleteTrack(payload, request) {
         filePath,
         timestamp: new Date().toISOString()
       })
-    }
+    })
     
-    // Delete metadata file last
-    fs.unlinkSync(trackPath)
-    console.log(`Deleted metadata: ${trackPath}`)
+    // Delete metadata from cache
+    await deleteTrackMetadata(trackId)
+    console.log(`Deleted metadata for track ${trackId} from cache`)
     
-    // Publish metadata deletion event
-    await publishMessage('micro:file-deleted', {
-      filePath: trackPath,
+    // Publish metadata deletion event for S3 cleanup
+    await publishMessage('track-metadata-deleted', {
+      trackId,
       timestamp: new Date().toISOString()
     })
     

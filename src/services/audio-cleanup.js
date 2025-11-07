@@ -1,7 +1,8 @@
-import fs from 'node:fs'
-import fsPromises from 'node:fs/promises'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createSubscriptionService } from 'micro-js'
+import { mergeAndUpdateTrackMetadata } from '../lib/metadata-cache.js'
+import { verifyFile, fileExists } from '../lib/fs-helpers.js'
 import Logger from 'micro-js/logger'
 
 const logger = new Logger({ logGroup: 'audio-cleanup' })
@@ -14,51 +15,12 @@ const CHECK_INTERVAL = 2000 // Check every 2 seconds
 const processingStatus = new Map()
 
 /**
- * Verify that a file exists and is valid
- * @param {string} filePath - Path to file
- * @param {string} description - Description for logging
- * @returns {{exists: boolean, size: number, error?: string}}
- */
-function verifyFile(filePath, description) {
-  try {
-    if (!fs.existsSync(filePath)) {
-      return {
-        exists: false,
-        size: 0,
-        error: `${description} does not exist: ${filePath}`
-      }
-    }
-    
-    const stat = fs.statSync(filePath)
-    
-    if (stat.size === 0) {
-      return {
-        exists: true,
-        size: 0,
-        error: `${description} is empty (0 bytes): ${filePath}`
-      }
-    }
-    
-    return {
-      exists: true,
-      size: stat.size
-    }
-  } catch (err) {
-    return {
-      exists: false,
-      size: 0,
-      error: `Error checking ${description}: ${err.message}`
-    }
-  }
-}
-
-/**
  * Wait for both transcode and metadata to complete
  * @param {Object} message - Processing message
  * @returns {Promise<{success: boolean, errors: string[], details: Object}>}
  */
 async function waitForProcessingComplete(message) {
-  const { messageId, trackId, transcodedFilePath, metadataFilePath, originalFilePath } = message
+  const { messageId, trackId, transcodedFilePath, waveformFilePath, originalFilePath } = message
   const startTime = Date.now()
   const errors = []
   
@@ -90,17 +52,17 @@ async function waitForProcessingComplete(message) {
       if (elapsed > PROCESSING_TIMEOUT) {
         clearInterval(checkInterval)
         
-        const transcodedCheck = verifyFile(transcodedFilePath, 'Transcoded file')
-        const metadataCheck = verifyFile(metadataFilePath, 'Metadata file')
-        const originalCheck = verifyFile(originalFilePath, 'Original file')
+        const transcodedCheck = await verifyFile(transcodedFilePath, 'Transcoded file')
+        const waveformCheck = await verifyFile(waveformFilePath, 'Waveform file')
+        const originalCheck = await verifyFile(originalFilePath, 'Original file')
         
         // Build detailed error report
         const timeoutErrors = []
         if (!transcodedCheck.exists || transcodedCheck.error) {
           timeoutErrors.push(transcodedCheck.error || 'Transcoded file missing')
         }
-        if (!metadataCheck.exists || metadataCheck.error) {
-          timeoutErrors.push(metadataCheck.error || 'Metadata file missing')
+        if (!waveformCheck.exists || waveformCheck.error) {
+          timeoutErrors.push(waveformCheck.error || 'Waveform file missing')
         }
         
         logger.error(`[${messageId}] Processing timeout after ${elapsed}ms`)
@@ -111,11 +73,11 @@ async function waitForProcessingComplete(message) {
             size: transcodedCheck.size,
             error: transcodedCheck.error
           },
-          metadata: {
-            path: metadataFilePath,
-            exists: metadataCheck.exists,
-            size: metadataCheck.size,
-            error: metadataCheck.error
+          waveform: {
+            path: waveformFilePath,
+            exists: waveformCheck.exists,
+            size: waveformCheck.size,
+            error: waveformCheck.error
           },
           original: {
             path: originalFilePath,
@@ -144,19 +106,20 @@ async function waitForProcessingComplete(message) {
       }
       
       // Check if both files exist and are valid
-      const transcodedCheck = verifyFile(transcodedFilePath, 'Transcoded file')
-      const metadataCheck = verifyFile(metadataFilePath, 'Metadata file')
-      const waveformCheck = verifyFile(waveformFilePath, 'Waveform file')
+      const transcodedCheck = await verifyFile(transcodedFilePath, 'Transcoded file')
+      const originalCheck = await verifyFile(originalFilePath, 'Original file')
+      const waveformCheck = await verifyFile(waveformFilePath, 'Waveform file')
 
       if (transcodedCheck.exists && !transcodedCheck.error && 
-          metadataCheck.exists && !metadataCheck.error &&
+          originalCheck.exists && !originalCheck.error &&
           waveformCheck.exists && !waveformCheck.error) {
         clearInterval(checkInterval)
         
         logger.info(`[${messageId}] Processing complete after ${elapsed}ms`)
         logger.info(`[${messageId}] Files verified:`, {
           transcoded: { path: transcodedFilePath, size: transcodedCheck.size },
-          metadata: { path: metadataFilePath, size: metadataCheck.size }
+          original: { path: originalFilePath, size: originalCheck.size },
+          waveform: { path: waveformFilePath, size: waveformCheck.size }
         })
         
         resolve({
@@ -166,42 +129,13 @@ async function waitForProcessingComplete(message) {
             trackId,
             elapsedTime: elapsed,
             transcodedSize: transcodedCheck.size,
-            metadataSize: metadataCheck.size
+            originalSize: originalCheck.size,
+            waveformSize: waveformCheck.size
           }
         })
       }
     }, CHECK_INTERVAL)
   })
-}
-
-/**
- * Update track metadata with processing results
- * @param {string} metadataFilePath - Path to metadata file
- * @param {boolean} success - Whether processing succeeded
- * @param {Array} errors - Any errors that occurred
- */
-async function updateTrackMetadata(metadataFilePath, success, errors = []) {
-  try {
-    if (!fs.existsSync(metadataFilePath)) {
-      logger.warn(`Cannot update metadata, file doesn't exist: ${metadataFilePath}`)
-      return
-    }
-    
-    const content = await fsPromises.readFile(metadataFilePath, 'utf-8')
-    const metadata = JSON.parse(content)
-    
-    metadata.processingStatus = success ? 'completed' : 'failed'
-    metadata.processingCompletedAt = new Date().toISOString()
-    
-    if (!success) {
-      metadata.processingErrors = errors
-    }
-    
-    await fsPromises.writeFile(metadataFilePath, JSON.stringify(metadata, null, 2))
-    logger.info(`Updated metadata with processing status: ${success ? 'completed' : 'failed'}`)
-  } catch (err) {
-    logger.error('Failed to update track metadata:', err)
-  }
 }
 
 /**
@@ -211,8 +145,8 @@ async function updateTrackMetadata(metadataFilePath, success, errors = []) {
  */
 async function cleanupOriginalFile(originalFilePath, messageId) {
   try {
-    if (!fs.existsSync(originalFilePath)) {
-      logger.warn(`[${messageId}] Original file already deleted: ${originalFilePath}`)
+    if (!await fileExists(originalFilePath)) {
+      logger.warn(`[${messageId}] Original file not found for cleanup: ${originalFilePath}`)
       return
     }
     
@@ -222,7 +156,7 @@ async function cleanupOriginalFile(originalFilePath, messageId) {
     /*
     setTimeout(async () => {
       try {
-        await fsPromises.unlink(originalFilePath)
+        await fs.unlink(originalFilePath)
         logger.info(`[${messageId}] Deleted original file: ${originalFilePath}`)
       } catch (err) {
         logger.error(`[${messageId}] Failed to delete original file:`, err)
@@ -239,8 +173,9 @@ async function cleanupOriginalFile(originalFilePath, messageId) {
  * Process cleanup and verification
  * @param {Object} message - Message from pubsub
  */
+// TODO use helper?
 async function processCleanup(message) {
-  const { messageId, trackId, originalFilePath, transcodedFilePath, metadataFilePath } = message
+  const { messageId, trackId, originalFilePath, transcodedFilePath, waveformFilePath } = message
   
   logger.info(`[${messageId}] Starting cleanup service for track ${trackId}`)
   
@@ -249,9 +184,11 @@ async function processCleanup(message) {
   
   if (result.success) {
     logger.info(`[${messageId}] ✅ Processing successful, initiating cleanup`)
-    
-    // Update metadata as completed
-    await updateTrackMetadata(metadataFilePath, true)
+
+    await mergeAndUpdateTrackMetadata(trackId, {
+      processingStatus: 'completed',
+      processingCompletedAt: new Date().toISOString()
+    })
     
     // Cleanup original file (stubbed)
     await cleanupOriginalFile(originalFilePath, messageId)
@@ -261,7 +198,11 @@ async function processCleanup(message) {
     logger.error(`[${messageId}] Failure details:`, result.details)
     
     // Update metadata as failed
-    await updateTrackMetadata(metadataFilePath, false, result.errors)
+    await mergeAndUpdateTrackMetadata(trackId, {
+      processingStatus: 'failed',
+      processingCompletedAt: new Date().toISOString(),
+      processingErrors: result.errors
+    })
     
     // Keep original file for debugging
     logger.info(`[${messageId}] Original file preserved for debugging: ${originalFilePath}`)

@@ -1,10 +1,12 @@
 import createFileUploadService, { validators } from 'micro-js/file-upload-service'
 import { publishMessage } from 'micro-js'
-import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { rawAudioDir, uploadsDir, metadataDir } from '../lib/utils.js'
+import { rawAudioDir, uploadsDir, waveformsDir } from '../lib/utils.js'
+import { setTrackMetadata } from '../lib/metadata-cache.js'
+import { safeDelete } from '../lib/fs-helpers.js'
 import Logger from 'micro-js/logger'
+
 const logger = new Logger({ logGroup: 'track-upload-service' })
 
 /**
@@ -70,23 +72,28 @@ export default async function createTrackUploadService({ useAuthService }) {
       // Use baseNameWithToken as the trackId for simplicity (matches filenames)
       const trackId = baseNameWithToken
       const transcodedFileName = `${baseNameWithToken}.webm`  // Opus in WebM container
-      const metadataFileName = `${baseNameWithToken}.json`
-      
+      const waveformFileName = `${baseNameWithToken}.png`
       // Build full paths
       const originalFilePath = path.join(rawAudioDir, file.savedName)
       const transcodedFilePath = path.join(uploadsDir, transcodedFileName)
-      const metadataFilePath = path.join(metadataDir, metadataFileName)
-      
+      const waveformFilePath = path.join(waveformsDir, waveformFileName)
+
       // Create initial track metadata with pending status
       const trackData = {
         id: trackId,  // Uses filename base for simplicity
         title,
         description: description || '',
+
         originalFileName: file.savedName,
         transcodedFileName: transcodedFileName,
+        waveformFileName: waveformFileName,
+
         fileType: file.mimeType,
         fileSize: file.size,
+
         audioUrl: `/api/audio/${transcodedFileName}`,
+        waveformUrl: `/api/waveforms/${waveformFileName}`,
+
         processingStatus: 'pending', // pending | processing | completed | failed
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -94,14 +101,15 @@ export default async function createTrackUploadService({ useAuthService }) {
         comments: []
       }
       
-      // Save initial metadata
-      fs.writeFileSync(metadataFilePath, JSON.stringify(trackData, null, 2))
+      // Save initial metadata to cache
+      await setTrackMetadata(trackId, trackData)
       
       console.log(`Track uploaded successfully: ${trackData.title} (${trackId})`)
       console.log(`Message ID: ${messageId}`)
       console.log(`Original: ${originalFilePath}`)
       console.log(`Transcoded: ${transcodedFilePath}`)
-      console.log(`Metadata: ${metadataFilePath}`)
+      console.log(`Waveform: ${waveformFilePath}`)
+      console.log(`Metadata stored in cache`)
       
       // Send success response immediately
       const response = {
@@ -132,9 +140,10 @@ export default async function createTrackUploadService({ useAuthService }) {
         trackId,
         originalFilePath,
         transcodedFilePath,
-        metadataFilePath,
+        waveformFilePath,
         timestamp: new Date().toISOString()
       })
+
       
     } catch (error) {
       console.error('Error in upload success handler:', error)
@@ -142,7 +151,7 @@ export default async function createTrackUploadService({ useAuthService }) {
       // Clean up uploaded file on metadata creation failure
       try {
         if (uploadData.file && uploadData.file.path) {
-          fs.unlinkSync(uploadData.file.path)
+          await fs.unlink(uploadData.file.path)
           console.log('Cleaned up uploaded file after metadata error')
         }
       } catch (cleanupError) {

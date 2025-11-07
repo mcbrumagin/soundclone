@@ -1,6 +1,4 @@
-import fs from 'node:fs'
-import path from 'node:path'
-import { metadataDir } from '../lib/utils.js'
+import { mergeAndUpdateTrackMetadata } from '../lib/metadata-cache.js'
 
 export default async function updateTrack(payload, request) {
   try {
@@ -13,21 +11,20 @@ export default async function updateTrack(payload, request) {
       throw error
     }
     
-    const trackPath = path.join(metadataDir, `${trackId}.json`)
+    // Build updates object
+    const updates = {}
+    if (title) updates.title = title
+    if (description !== undefined) updates.description = description
     
-    if (!fs.existsSync(trackPath)) {
+    // Merge updates into cache (atomic operation)
+    const trackData = await mergeAndUpdateTrackMetadata(trackId, updates)
+    
+    if (!trackData) {
       const error = new Error('Track not found')
       error.status = 404
       throw error
     }
     
-    const trackData = JSON.parse(fs.readFileSync(trackPath, 'utf8'))
-    
-    if (title) trackData.title = title
-    if (description !== undefined) trackData.description = description
-    trackData.updatedAt = new Date().toISOString()
-    
-    fs.writeFileSync(trackPath, JSON.stringify(trackData, null, 2))
     return { success: true, track: trackData }
   } catch (err) {
     console.error('updateTrack service error:', err)

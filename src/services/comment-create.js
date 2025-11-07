@@ -1,7 +1,8 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import crypto from 'node:crypto'
-import { metadataDir } from '../lib/utils.js'
+import { getTrackMetadata, mergeAndUpdateTrackMetadata } from '../lib/metadata-cache.js'
+import Logger from 'micro-js/logger'
+
+const logger = new Logger({ logGroup: 'comment-create' })
 
 function parseCommentTimestamp(text) {
   const hasTimestamp = text.includes('@')
@@ -22,31 +23,16 @@ function parseCommentTimestamp(text) {
 
 export default async function createComment(payload, request) {
   try {
-    console.log('createComment service called')
     const { trackId, text } = payload || {}
 
-    console.log('createComment service payload', payload)
-    if (!trackId) {
-      const error = new Error('Track ID is required')
-      error.status = 400
-      throw error
-    }
+    logger.info('creating comment for track:', trackId)
+    logger.debug('comment text:', text)
+
+    if (!trackId) throw new HttpError(400, 'Track ID is required')
+    if (!text) throw new HttpError(400, 'Comment text is required')
     
-    const trackPath = path.join(metadataDir, `${trackId}.json`)
-    
-    if (!fs.existsSync(trackPath)) {
-      const error = new Error('Track not found')
-      error.status = 404
-      throw error
-    }
-    
-    const trackData = JSON.parse(fs.readFileSync(trackPath, 'utf8'))
-    
-    if (!text) {
-      const error = new Error('Comment text is required')
-      error.status = 400
-      throw error
-    }
+    const trackData = await getTrackMetadata(trackId)
+    if (!trackData) throw new HttpError(404, 'Track not found')
     
     const commentId = crypto.randomUUID()
     const { hasTimestamp, trackTimestamp } = parseCommentTimestamp(text)
@@ -60,10 +46,12 @@ export default async function createComment(payload, request) {
       trackTimestamp
     }
     
-    trackData.comments.push(comment)
-    trackData.updatedAt = new Date().toISOString()
+    // Add comment to track's comments array
+    const comments = [...(trackData.comments || []), comment]
     
-    fs.writeFileSync(trackPath, JSON.stringify(trackData, null, 2))
+    // Merge into cache
+    await mergeAndUpdateTrackMetadata(trackId, { comments })
+    
     return { success: true, comment }
   } catch (err) {
     console.error('createComment service error:', err)
