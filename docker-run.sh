@@ -24,7 +24,7 @@ FFMPEG_PORT=4001
 
 # Use environment variables from shell or defaults
 export ENVIRONMENT="${ENVIRONMENT:-dev}"
-export LOG_LEVEL="${LOG_LEVEL:-info}"
+export LOG_LEVEL="${LOG_LEVEL:-debug}"
 export LOG_INCLUDE_LINES="${LOG_INCLUDE_LINES:-true}"
 export LOG_EXCLUDE_FULL_PATH_IN_LOG_LINES="${LOG_EXCLUDE_FULL_PATH_IN_LOG_LINES:-true}"
 export AWS_REGION="${AWS_REGION:-us-east-1}"
@@ -59,21 +59,31 @@ docker network inspect $NETWORK_NAME >/dev/null 2>&1 || \
 echo -e "${GREEN}✓ Network ready: $NETWORK_NAME${NC}"
 echo ""
 
-# Build main service
-echo -e "${BLUE}🔨 Building main service...${NC}"
-docker build -t soundclone-main:latest .
+# Build main service using buildx with shared lib context
+echo -e "${BLUE}🔨 Building main service with buildx...${NC}"
+docker buildx build \
+  --load \
+  --build-context shared-lib=src/lib \
+  -t soundclone-main:latest \
+  -f src/app/Dockerfile \
+  src/app/
 echo -e "${GREEN}✓ Main service built${NC}"
 echo ""
 
-# Build ffmpeg service
-echo -e "${BLUE}🔨 Building ffmpeg service...${NC}"
-docker build -t soundclone-ffmpeg:latest -f src-ffmpeg-service/Dockerfile .
+# Build ffmpeg service using buildx with shared lib context
+echo -e "${BLUE}🔨 Building ffmpeg service with buildx...${NC}"
+docker buildx build \
+  --load \
+  --build-context shared-lib=src/lib \
+  -t soundclone-ffmpeg:latest \
+  -f src/ffmpeg/Dockerfile \
+  src/ffmpeg/
 echo -e "${GREEN}✓ FFmpeg service built${NC}"
 echo ""
 
-# Stop and remove existing containers
-docker stop $MAIN_CONTAINER $FFMPEG_CONTAINER 2>/dev/null || true
-docker rm $MAIN_CONTAINER $FFMPEG_CONTAINER 2>/dev/null || true
+# # Stop and remove existing containers
+# docker stop $MAIN_CONTAINER $FFMPEG_CONTAINER 2>/dev/null || true
+# docker rm $MAIN_CONTAINER $FFMPEG_CONTAINER 2>/dev/null || true
 
 # Start main service
 echo -e "${BLUE}🚀 Starting main service...${NC}"
@@ -82,8 +92,8 @@ docker run -d \
   --network $NETWORK_NAME \
   -p $MAIN_PORT:10000 \
   -e MICRO_REGISTRY_URL="http://$MAIN_CONTAINER:10000" \
-  -e STATIC_FILE_SERVICE_URL="http://$MAIN_CONTAINER:10000" \
   -e ENVIRONMENT="$ENVIRONMENT" \
+  -e NODE_MODULES_DIR="../../node_modules" \
   -e LOG_LEVEL="$LOG_LEVEL" \
   -e LOG_INCLUDE_LINES="$LOG_INCLUDE_LINES" \
   -e LOG_EXCLUDE_FULL_PATH_IN_LOG_LINES="$LOG_EXCLUDE_FULL_PATH_IN_LOG_LINES" \

@@ -47,10 +47,13 @@ import deleteComment from './services/comments/comment-delete.js'
 import { ensureDataDirectories } from '../lib/utils.js'
 
 // ---external services---------------------------------------
-import initializeMusicMetadataProcessor from '../ffmpeg/music-meta.js'
-import initializeAudioTranscodeService from '../ffmpeg/audio-transcode.js'
-import initializeWaveformGenerator from '../ffmpeg/waveform-generator.js'
-
+async function importAtRunTime() {
+  return [
+    (await import('../ffmpeg/music-meta.js')).default,
+    (await import('../ffmpeg/audio-transcode.js')).default,
+    (await import('../ffmpeg/waveform-generator.js')).default
+  ]
+}
 
 // ---setup system---------------------------------------------
 overrideConsoleGlobally({ includeLogLineNumbers: true })
@@ -60,6 +63,7 @@ const logger = new Logger({ logGroup: 'app' })
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+const NODE_MODULES_DIR = envConfig.get('NODE_MODULES_DIR', path.join(__dirname, '../node_modules'))
 const MICRO_REGISTRY_URL = envConfig.getRequired('MICRO_REGISTRY_URL')
 const PORT = MICRO_REGISTRY_URL.split(':')[2]
 
@@ -88,15 +92,33 @@ async function startServer() {
     // omit these on prod, they should be deployed separately
     if (!process.env.ENVIRONMENT || process.env.ENVIRONMENT.toLowerCase().includes('local')) {
       logger.warn('non-prod environment; initializing ffmpeg services')
-      services = services.concat(await Promise.all([
-        initializeMusicMetadataProcessor(),
-        initializeAudioTranscodeService(),
-        initializeWaveformGenerator(),
-      ]))
+      services = services.concat(await Promise.all(await importAtRunTime()))
     } else logger.warn('prod environment; ffmpeg services should run separately')
 
     // register routes - will implcitly create services for each route
     services = services.concat(await createRoutes({
+      '/debug': async function debug(payload) {
+        let response = await fetch(MICRO_REGISTRY_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'micro-command': 'service-lookup',
+            'micro-service-name': '*'
+          },
+          body: JSON.stringify(payload)
+        })
+        if (!response.ok) {
+          throw new Error(`Service call failed: ${response.status} ${response.statusText}`)
+        }
+        return await response.json()
+      },
+      '/triggerEventTest': async function triggerEventTest(payload) {
+        return await publishMessage('transcodeAudio', {
+          messageId: 'test',
+          trackId: 'test',
+          transcodedFileUrl: 'test'
+        })
+      },
       '/health': getHealth,
       '/getTrackList': getTrackList,
       '/getTrackDetail': getTrackDetail,
@@ -138,7 +160,8 @@ async function startServer() {
           // Images - waveforms
           '/images/waveforms/*': '../../../data/images/waveforms',
 
-          '/micro-js-html/*': '../node_modules/micro-js-html/src'
+          // TODO ../ on local ../../ on docker|dev|prod
+          '/micro-js-html/*': path.join(NODE_MODULES_DIR, 'micro-js-html/src')
         }
       })
     }))
