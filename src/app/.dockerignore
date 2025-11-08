@@ -1,0 +1,39 @@
+
+# Editor/IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Version control
+.git/
+.gitignore
+
+# Docker specific
+Dockerfile
+.dockerignore
+
+# Temporary files and logs
+tmp/
+logs/
+*.log
+*.tmp
+
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.git
+.gitignore
+.env
+.DS_Store
+README.md
+LICENSE
+Dockerfile
+docker-compose.yml
+
+# TODO should move these to sister src dirs
+src/services/ffmpeg
+src/services/python

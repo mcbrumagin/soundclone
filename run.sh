@@ -7,7 +7,7 @@ export LOG_EXCLUDE_FULL_PATH_IN_LOG_LINES=true
 
 export AWS_REGION=us-east-1
 export S3_BUCKET_NAME=soundclone-data
-export S3_PREFIX=soundclone/
+export S3_PREFIX=soundclone-local/
 
 export ADMIN_USER=admin
 export ADMIN_SECRET=password

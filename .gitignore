@@ -1,6 +1,7 @@
 node_modules
 TODO.md
-data/uploads/
-data/rawAudio/
-data/metadata/
-data/waveforms/
+
+data/audio/raw/
+data/audio/optimized/
+data/images/waveforms/
+

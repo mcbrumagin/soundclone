@@ -1,4 +1,6 @@
-rm -rf data/uploads/*
-rm -rf data/rawAudio/*
-rm -rf data/metadata/*
-rm -rf data/waveforms/*
+#!/bin/bash
+# Clean all data directories
+rm -rf data/audio/raw/*
+rm -rf data/audio/optimized/*
+rm -rf data/images/waveforms/*
+echo "✓ Cleaned all data directories"

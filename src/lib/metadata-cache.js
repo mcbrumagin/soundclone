@@ -6,8 +6,10 @@ const logger = new Logger({ logGroup: 'metadata-cache' })
  * Get track metadata from cache
  */
 export async function getTrackMetadata(trackId) {
+  logger.debug('getTrackMetadata called with trackId:', trackId)
   try {
     const result = await callService('cache-service', { get: trackId })
+    logger.warn('getTrackMetadata result:', result)
     return result || null
   } catch (error) {
     console.error(`Failed to get track metadata for ${trackId}:`, error)
@@ -38,6 +40,7 @@ export async function setTrackMetadata(trackId, metadata) {
  * This prevents race conditions by fetching, merging, and setting in one call
  */
 export async function mergeAndUpdateTrackMetadata(trackId, updates) {
+  logger.debug('mergeAndUpdateTrackMetadata called with trackId:', trackId, 'updates:', updates)
   try {
     // Get current metadata
     const current = await getTrackMetadata(trackId)
@@ -56,6 +59,7 @@ export async function mergeAndUpdateTrackMetadata(trackId, updates) {
     
     // Set back to cache
     await setTrackMetadata(trackId, merged)
+    logger.debug('mergeAndUpdateTrackMetadata merged:', merged)
     
     return merged
   } catch (error) {
