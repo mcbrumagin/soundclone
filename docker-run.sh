@@ -113,7 +113,23 @@ echo ""
 
 # Wait for main service to be ready
 echo -e "${BLUE}⏳ Waiting for main service to be ready...${NC}"
-sleep 3
+sleep 5
+
+# Check if main service health endpoint is responding
+echo -e "${BLUE}🔍 Checking main service health...${NC}"
+for i in {1..30}; do
+  if curl -s -f http://localhost:$MAIN_PORT/health > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Main service is healthy${NC}"
+    break
+  fi
+  if [ $i -eq 30 ]; then
+    echo -e "${YELLOW}⚠️  Main service health check timed out, proceeding anyway${NC}"
+  else
+    echo -e "${BLUE}  Attempt $i/30 - waiting...${NC}"
+    sleep 1
+  fi
+done
+echo ""
 
 # Start ffmpeg service
 echo -e "${BLUE}🚀 Starting ffmpeg service...${NC}"
