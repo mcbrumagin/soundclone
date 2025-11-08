@@ -43,15 +43,39 @@ jobs:
           echo "service_name=portfolio-dev-service" >> $GITHUB_OUTPUT
         fi
 
-    - name: Build and push Docker image
+    - name: Build and push main app Docker image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: soundclone-app
         IMAGE_TAG: ${{ steps.env.outputs.image_tag }}
         ENVIRONMENT: ${{ steps.env.outputs.environment }}
       run: |
+        echo "Building main app for $ENVIRONMENT"
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    - name: Build and push FFmpeg service Docker image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: soundclone-ffmpeg
+        IMAGE_TAG: ${{ steps.env.outputs.image_tag }}
+        ENVIRONMENT: ${{ steps.env.outputs.environment }}
+      run: |
+        echo "Building FFmpeg service for $ENVIRONMENT"
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f src/services/ffmpeg/Dockerfile .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    # Python service - stubbed out for future deployment
+    # - name: Build and push Python service Docker image
+    #   env:
+    #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+    #     ECR_REPOSITORY: soundclone-python
+    #     IMAGE_TAG: ${{ steps.env.outputs.image_tag }}
+    #     ENVIRONMENT: ${{ steps.env.outputs.environment }}
+    #   run: |
+    #     echo "Building Python service for $ENVIRONMENT"
+    #     docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f src/services/python/Dockerfile .
+    #     docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
     - name: Force new deployment
       env:
@@ -62,5 +86,6 @@ jobs:
         echo "Deploying to $ENVIRONMENT environment"
         echo "Cluster: $CLUSTER_NAME"
         echo "Service: $SERVICE_NAME"
+        echo "Note: Single ECS task with 3 containers (portfolio, soundclone-app, soundclone-ffmpeg)"
         aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --force-new-deployment
 
