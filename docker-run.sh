@@ -33,10 +33,12 @@ export S3_PREFIX="${S3_PREFIX:-soundclone-local/}"
 export ADMIN_USER="${ADMIN_USER:-admin}"
 export ADMIN_SECRET="${ADMIN_SECRET:-password}"
 
-# Check for required AWS credentials
+# Note: AWS credentials are optional
+# If not provided, services will use the default AWS credential chain
+# (useful for ECS task roles, EC2 instance profiles, etc.)
 if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-  echo -e "${YELLOW}⚠️  Warning: AWS credentials not found in environment${NC}"
-  echo -e "${YELLOW}   Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY for S3 functionality${NC}"
+  echo -e "${BLUE}ℹ️  AWS credentials not provided - using default credential chain${NC}"
+  echo -e "${BLUE}   (This is normal for ECS deployments with task roles)${NC}"
   echo ""
 fi
 

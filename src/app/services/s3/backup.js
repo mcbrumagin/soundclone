@@ -10,13 +10,26 @@ import Logger from 'micro-js/logger'
 const logger = new Logger({ logGroup: 's3-backup' })
 
 // S3 configuration
-const s3Client = new S3Client({
-  region: envConfig.get('AWS_REGION') || 'us-east-1',
-  credentials: {
-    accessKeyId: envConfig.getRequired('AWS_ACCESS_KEY_ID'),
-    secretAccessKey: envConfig.getRequired('AWS_SECRET_ACCESS_KEY')
+// Note: In ECS, credentials are automatically provided by the task role
+// Only provide explicit credentials if they're set (for local development)
+const s3ClientConfig = {
+  region: envConfig.get('AWS_REGION') || 'us-east-1'
+}
+
+const accessKeyId = envConfig.get('AWS_ACCESS_KEY_ID')
+const secretAccessKey = envConfig.get('AWS_SECRET_ACCESS_KEY')
+
+if (accessKeyId && secretAccessKey) {
+  logger.info('Using explicit AWS credentials from environment')
+  s3ClientConfig.credentials = {
+    accessKeyId,
+    secretAccessKey
   }
-})
+} else {
+  logger.info('Using default AWS credential chain (task role / instance profile)')
+}
+
+const s3Client = new S3Client(s3ClientConfig)
 
 const BUCKET_NAME = envConfig.getRequired('S3_BUCKET_NAME')
 const S3_PREFIX = envConfig.get('S3_PREFIX') || 'soundclone/'
@@ -232,14 +245,6 @@ async function handleTrackMetadataDeleted(message) {
 export default async function initializeS3BackupService() {
   if (!BUCKET_NAME) {
     logger.warn('S3_BUCKET_NAME not configured, skipping S3 backup service')
-    return {
-      name: 's3-backup',
-      terminate: async () => {}
-    }
-  }
-  
-  if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
-    logger.warn('AWS credentials not configured, skipping S3 backup service')
     return {
       name: 's3-backup',
       terminate: async () => {}
