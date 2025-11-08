@@ -15,6 +15,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -50,9 +53,14 @@ jobs:
         IMAGE_TAG: ${{ steps.env.outputs.image_tag }}
         ENVIRONMENT: ${{ steps.env.outputs.environment }}
       run: |
-        echo "Building main app for $ENVIRONMENT"
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        echo "Building main app for $ENVIRONMENT with shared lib context"
+        docker buildx build \
+          --push \
+          --platform linux/amd64 \
+          --build-context shared-lib=src/lib \
+          -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+          -f src/app/Dockerfile \
+          src/app/
 
     - name: Build and push FFmpeg service Docker image
       env:
@@ -61,9 +69,14 @@ jobs:
         IMAGE_TAG: ${{ steps.env.outputs.image_tag }}
         ENVIRONMENT: ${{ steps.env.outputs.environment }}
       run: |
-        echo "Building FFmpeg service for $ENVIRONMENT"
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f src/services/ffmpeg/Dockerfile .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        echo "Building FFmpeg service for $ENVIRONMENT with shared lib context"
+        docker buildx build \
+          --push \
+          --platform linux/amd64 \
+          --build-context shared-lib=src/lib \
+          -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+          -f src/ffmpeg/Dockerfile \
+          src/ffmpeg/
 
     # Python service - stubbed out for future deployment
     # - name: Build and push Python service Docker image
@@ -74,8 +87,12 @@ jobs:
     #     ENVIRONMENT: ${{ steps.env.outputs.environment }}
     #   run: |
     #     echo "Building Python service for $ENVIRONMENT"
-    #     docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f src/services/python/Dockerfile .
-    #     docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+    #     docker buildx build \
+    #       --push \
+    #       --platform linux/amd64 \
+    #       -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+    #       -f src/python/Dockerfile \
+    #       src/python/
 
     - name: Force new deployment
       env:
