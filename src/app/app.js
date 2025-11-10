@@ -1,27 +1,24 @@
-import { 
-  registryServer, 
-  createRoutes,
-  createService,
-  callService,
-  overrideConsoleGlobally,
-  HttpError,
-  createCacheService,
-  publishMessage,
-  Logger,
-  createAuthService,
-  createStaticFileService,
-  envConfig
-} from 'micro-js'
-
-
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// TODO remove
-// import createAuthService from 'micro-js/auth-service'
-// import createStaticFileService from 'micro-js/static-file-service'
 
-// ---local services-------------------------------------------
+// ---micro core-----------------------------------------------------
+import {
+  registryServer,
+  createRoutes,
+  createService,
+  callService,
+  publishMessage,
+  HttpError,
+  createCacheService,
+  createAuthService,
+  createStaticFileService,
+  envConfig,
+  overrideConsoleGlobally,
+  Logger,
+} from 'micro-js'
+
+// ---local services-------------------------------------------------
 import initializeAudioCleanupService from './services/audio-cleanup.js'
 import getTrackMetadataFromCache from './services/tracks/get-track-metadata.js'
 import getHealth from './services/health.js'
@@ -43,10 +40,10 @@ import createComment from './services/comments/comment-create.js'
 import updateComment from './services/comments/comment-update.js'
 import deleteComment from './services/comments/comment-delete.js'
 
-// ---shared libraries----------------------------------------
+// ---shared libraries-----------------------------------------------
 import { ensureDataDirectories } from '../lib/utils.js'
 
-// ---external services---------------------------------------
+// ---external services----------------------------------------------
 async function importAtRunTime() {
   return [
     (await import('../ffmpeg/music-meta.js')).default,
@@ -55,7 +52,7 @@ async function importAtRunTime() {
   ]
 }
 
-// ---setup system---------------------------------------------
+// ---setup system---------------------------------------------------
 overrideConsoleGlobally({ includeLogLineNumbers: true })
 ensureDataDirectories()
 
@@ -63,9 +60,16 @@ const logger = new Logger({ logGroup: 'app' })
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const NODE_MODULES_DIR = envConfig.get('NODE_MODULES_DIR', path.join(__dirname, '../node_modules'))
+
 const MICRO_REGISTRY_URL = envConfig.getRequired('MICRO_REGISTRY_URL')
 const PORT = MICRO_REGISTRY_URL.split(':')[2]
+const NODE_MODULES_DIR = envConfig.get('NODE_MODULES_DIR', '../node_modules')
+
+const ENVIRONMENT = envConfig.get('ENVIRONMENT', 'dev').toLowerCase()
+const isLocal = ENVIRONMENT.includes('local')
+const isDev = ENVIRONMENT.includes('dev')
+const isProd = ENVIRONMENT.includes('prod')
+
 
 async function startServer() {
   try {
@@ -90,38 +94,28 @@ async function startServer() {
     ]))
 
     // omit these on prod, they should be deployed separately
-    if (!process.env.ENVIRONMENT || process.env.ENVIRONMENT.toLowerCase().includes('local')) {
+    if (isLocal) {
       logger.warn('non-prod environment; initializing ffmpeg services')
       services = services.concat(await Promise.all(await importAtRunTime()))
     } else logger.warn('prod environment; ffmpeg services should run separately')
 
-    // register routes - will implcitly create services for each route
-    services = services.concat(await createRoutes({
-      '/debug': async function debug(payload) {
-        let response = await fetch(MICRO_REGISTRY_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'micro-command': 'service-lookup',
-            'micro-service-name': '*'
-          },
-          body: JSON.stringify(payload)
-        })
-        if (!response.ok) {
-          throw new Error(`Service call failed: ${response.status} ${response.statusText}`)
-        }
-        return await response.json()
-      },
-      '/triggerEventTest': async function triggerEventTest(payload) {
-        return await publishMessage('transcodeAudio', {
-          messageId: 'test',
-          trackId: 'test',
-          transcodedFileUrl: 'test'
-        })
-      },
+    // internal upload services don't need routes
+    // allows the ffmpeg container to pass files back to static-file-service
+    services = services.concat([
+      await createTranscodedAudioUploadService(),
+      await createWaveformUploadService()
+    ])
+
+    let routeMap = {
       '/health': getHealth,
       '/getTrackList': getTrackList,
       '/getTrackDetail': getTrackDetail,
+      '/updateTrack': updateTrack,
+      '/deleteTrack': deleteTrack,
+      '/createComment': createComment,
+      '/updateComment': updateComment,
+      '/deleteComment': deleteComment,
+      '/getTrackMetadata': getTrackMetadataFromCache,
       '/uploadTrack': await createTrackUploadService({
         serviceName: 'track-upload-service',
         useAuthService: 'auth-service',
@@ -129,15 +123,6 @@ async function startServer() {
         updateChannel: 'micro:file-updated',
         urlPathPrefix: '/audio/raw'
       }),
-      // TODO do we need routes to call these? May need more integration tests
-      '/uploadTranscodedAudio': await createTranscodedAudioUploadService(),
-      '/uploadWaveform': await createWaveformUploadService(),
-      '/updateTrack': updateTrack,
-      '/deleteTrack': deleteTrack,
-      '/createComment': createComment,
-      '/updateComment': updateComment,
-      '/deleteComment': deleteComment,
-      '/getTrackMetadata': getTrackMetadataFromCache,
       '/*': await createStaticFileService({
         rootDir: path.join(__dirname, 'public'),
         urlRoot: '/',
@@ -152,35 +137,40 @@ async function startServer() {
           '/css/*': 'css',
           '/js/*': 'js',
           '/assets/*': 'assets',
-
-          // Audio files - new directory structure matching URLs
           '/audio/raw/*': '../../../data/audio/raw',
           '/audio/optimized/*': '../../../data/audio/optimized',
-          
-          // Images - waveforms
           '/images/waveforms/*': '../../../data/images/waveforms',
-
-          // TODO ../ on local ../../ on docker|dev|prod
           '/micro-js-html/*': path.join(NODE_MODULES_DIR, 'micro-js-html/src')
         }
       })
-    }))
+    }
 
-    // ALB healthcheck simulator
-    // if (process.env.ENVIRONMENT?.includes('dev')) setInterval(async () => {
-    //   try {
-    //     let result =await callService('getHealth')
-    //     logger.debug('healthcheck simulator passed: ', result)
-    //   } catch (error) {
-    //     logger.error('healthcheck simulator failed: ', error)
-    //   }
-    // }, 1000)
+    if (isLocal || isDev) {
+      routeMap['/debug'] = async function debug(payload) {
+        let response = await fetch(MICRO_REGISTRY_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'micro-command': 'service-lookup',
+            'micro-service-name': '*'
+          },
+          body: JSON.stringify(payload)
+        })
+        if (!response.ok) {
+          throw new Error(`Service call failed: ${response.status} ${response.statusText}`)
+        }
+        return await response.json()
+      }
+    }
+
+    // register routes - will implcitly create services for each route
+    services = services.concat(await createRoutes(routeMap))
     
-    logger.info(`🔧 Registered services:\n  - ${services.map(service => service?.name).join('\n  - ')}`)
+    logger.info(`Registered services:\n  - ${services.map(service => service?.name).join('\n  - ')}`)
     logger.info(`SoundClone v0 server running on http://localhost:${PORT}`)
 
     // TODO shutdown helper in registry that calls terminate on all services then kills itself
-    // services will need to be aware of any same host neighbors on same MICRO_SERVICE_URL, they will need to kill themselves too
+    // each node will need a node-serivce for health, service cache updates, and termination
     let isTerminating = false
     const gracefulShutdown = async (signal) => {
       if (isTerminating) return
