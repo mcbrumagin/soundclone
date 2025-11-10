@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SoundClone v0</title>
+    <link rel="stylesheet" href="css/main.css">
+    <!-- this is a blocking request for some reason -->
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"> -->
+    <script src="/micro-js-html/client-init.js"></script>
+    <script src="/micro-js-html/client-utils.js"></script>
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+    <div id="app">
+        <!-- App will be rendered here by micro-js-html -->
+    </div>
+    <div id="audio-player">
+        <!-- Audio player will be rendered here by micro-js-html -->
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "micro-js-html": "/micro-js-html/index.js"
+            }
+        }
+    </script>
+    
+    <!-- Load audio player system first -->
+    <!-- <script src="js/audio-player.js"></script> -->
+    
+    <!-- Load main application -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
