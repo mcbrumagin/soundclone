@@ -1,5 +1,5 @@
 {
   "dependencies": {
-    "micro-js": "file:../micro-js"
+    "micro-js": "^0.2.10"
   }
 }
