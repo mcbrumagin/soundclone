@@ -93,7 +93,16 @@ window.renderAudioButtons = renderHelper('.audio-control', element => {
   console.log({isPlaying: appState.player.isPlaying})
   if (element.classList.contains('player-control')) {
     return player.renderPlayButton(element).render()
+  } else if (element.classList.contains('play-track-detail')) {
+    // Track detail page play button
+    const trackId = element.dataset.trackId
+    const track = appState.tracks.find(t => t.id === trackId)
+    if (track) {
+      return trackDetailView.renderPlayButton(track).render()
+    }
+    return homeView.renderPlayButton(element).render()
   } else {
+    // Home view track card play buttons
     return homeView.renderPlayButton(element).render()
   }
 })
@@ -158,6 +167,18 @@ const bootstrap = async () => {
   // Handle initial route
   handleRouteChange()
   
+  // If landing on a track detail page, load that track into the player
+  const hash = window.location.hash.substring(1) || 'home'
+  const [view, trackId] = hash.split('/')
+  if (view === 'track-detail' && trackId) {
+    const track = appState.tracks.find(t => t.id === trackId)
+    if (track) {
+      console.log('Landing on track detail page, loading track into player:', trackId)
+      await player.loadTrack(track)
+      window.renderPlayer()
+    }
+  }
+  
   // If no hash is present, ensure we start at home
   if (!window.location.hash) {
     window.location.hash = '#home'
@@ -165,15 +186,11 @@ const bootstrap = async () => {
 
   // Start polling for new tracks
   trackPollingService.start((newTracks) => {
-    // Only update if tracks actually changed
-    const hasChanges = newTracks.length !== appState.tracks.length ||
-      !newTracks.every((track, i) => track.id === appState.tracks[i]?.id)
-    
-    if (hasChanges) {
-      console.log('Updating tracks from polling service')
-      appState.tracks = newTracks
-      window.renderApp()
-    }
+    // Always update tracks - the polling service handles when to suspend
+    console.log('Updating tracks from polling service')
+    appState.tracks = newTracks
+    // TODO only render if deepDiff returns true for last newTracks vs appState.tracks?
+    window.renderApp()
   })
 }
 

@@ -362,6 +362,21 @@ export default class TrackDetailView {
     )
   }
 
+  getTrackState(track) {
+    const { isPlaying, currentTrack } = appState.player
+    const isThisTrackPlaying = currentTrack && isPlaying && currentTrack.id === track.id
+    const isThisTrackPaused = currentTrack && !isPlaying && currentTrack.id === track.id
+    return { currentTrack, isPlaying, isThisTrackPlaying, isThisTrackPaused }
+  }
+
+  renderPlayButton(track) {
+    const { isThisTrackPlaying, isThisTrackPaused } = this.getTrackState(track)
+    return span({},
+      i({ class: isThisTrackPlaying ? 'fas fa-pause' : 'fas fa-play' }), 
+      isThisTrackPlaying ? ' Pause' : isThisTrackPaused ? ' Resume' : ' Play'
+    )
+  }
+
   render(track) {
     console.log('track detail view render', track)
     // Store current track for methods to access
@@ -383,6 +398,21 @@ export default class TrackDetailView {
           ),
           div({ class: 'track-actions' },
             button({ 
+              class: 'play-track-detail audio-control',
+              'data-track-id': track.id,
+              onclick: () => {
+                const { isThisTrackPlaying } = this.getTrackState(track)
+                if (isThisTrackPlaying) {
+                  appState.player.pause()
+                } else {
+                  appState.player.play(track.id)
+                }
+              }
+            },
+              this.renderPlayButton(track)
+            ),
+            button({ 
+              class: 'secondary',
               id: 'shareButton', 
               onclick: () => this.handleShare(track) 
             },
@@ -447,8 +477,8 @@ export default class TrackDetailView {
           // Update progress immediately
           this.updateWaveformProgress(seekTime, duration)
           
-          // Auto-play after seeking
-          if (!appState.player.isPlaying) {
+          // Auto-play after seeking (always play if new track, or if not playing)
+          if (wasNewTrack || !appState.player.isPlaying) {
             await appState.player.play(track.id)
           }
         }

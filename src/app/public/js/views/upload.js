@@ -12,6 +12,64 @@ export default class UploadView {
     this.uploadStatus = null
     this.title = ''
     this.description = ''
+    this.dragDropInitialized = false
+  }
+
+  setupDragAndDrop() {
+    const dropArea = document.getElementById('dropArea')
+    if (!dropArea) return
+    
+    // Only set up once - check if we already marked this specific element
+    if (dropArea.dataset.dragDropReady === 'true') return
+    
+    console.log('Setting up drag and drop listeners')
+    
+    // Prevent default drag behaviors
+    const preventDefaults = (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    
+    // Highlight drop area when dragging over it
+    const highlight = (e) => {
+      preventDefaults(e)
+      dropArea.classList.add('dragover')
+    }
+    
+    const unhighlight = (e) => {
+      preventDefaults(e)
+      dropArea.classList.remove('dragover')
+    }
+    
+    // Handle dropped files
+    const handleDrop = (e) => {
+      preventDefaults(e)
+      unhighlight(e)
+      
+      const dt = e.dataTransfer
+      const files = dt.files
+      
+      if (files.length > 0) {
+        console.log('File dropped:', files[0].name)
+        this.handleFileSelect(files[0])
+      }
+    }
+    
+    // Add event listeners to drop area
+    dropArea.addEventListener('dragenter', highlight)
+    dropArea.addEventListener('dragover', highlight)
+    dropArea.addEventListener('dragleave', unhighlight)
+    dropArea.addEventListener('drop', handleDrop)
+    
+    // Prevent default drag behaviors on document body to avoid file opening in browser
+    document.body.addEventListener('dragover', preventDefaults)
+    document.body.addEventListener('drop', preventDefaults)
+    
+    // Mark this element as initialized
+    dropArea.dataset.dragDropReady = 'true'
+    this.dragDropInitialized = true
+    
+    console.log('✓ Drag and drop enabled')
   }
 
   handleFileSelect(file) {
@@ -166,6 +224,7 @@ export default class UploadView {
     this.title = ''
     this.description = ''
     this.dragover = false
+    this.dragDropInitialized = false // Reset to allow re-initialization on next render
     
     const fileInput = document.getElementById('fileInput')
     const titleInput = document.getElementById('uploadTitleInput')
@@ -177,6 +236,9 @@ export default class UploadView {
   }
 
   render() {
+    // Set up drag and drop after DOM is rendered
+    setTimeout(() => this.setupDragAndDrop(), 0)
+    
     return main({ class: 'container' },
       a({ class: 'back-button', 'data-view': 'home', href: '#home' },
         i({ class: 'fas fa-arrow-left' }), ' Back to Home'
@@ -186,23 +248,7 @@ export default class UploadView {
         div({ 
           class: `file-drop-area ${this.dragover ? 'dragover' : ''}`, 
           id: 'dropArea',
-          onclick: () => document.getElementById('fileInput')?.click(),
-          ondragover: (e) => {
-            e.preventDefault()
-            this.dragover = true
-            window.renderApp()
-          },
-          ondragleave: () => {
-            this.dragover = false
-            window.renderApp()
-          },
-          ondrop: (e) => {
-            e.preventDefault()
-            this.dragover = false
-            if (e.dataTransfer.files.length) {
-              this.handleFileSelect(e.dataTransfer.files[0])
-            }
-          }
+          onclick: () => document.getElementById('fileInput')?.click()
         },
           i({ class: 'fas fa-cloud-upload-alt fa-3x' }),
           p({}, 'Drag & Drop or Click to Select File'),
