@@ -1,4 +1,5 @@
 import { htmlTags } from 'micro-js-html'
+import { showAlert } from '../components/modal.js'
 
 const { div, h1, form, input, button } = htmlTags
 
@@ -23,16 +24,31 @@ export default class LoginView {
       window.location.hash = '#home'
       window.renderApp()
     } else {
-      alert('Login failed')
+      await showAlert('Invalid username or password', 'Login Failed')
     }
   }
 
   render() {
     return div({ class: 'login-container' },
       h1({ class: 'page-title' }, 'Login'),
-      form({ class: 'login-for form-group' },
-        input({ class: 'form-control', id: 'loginUsername', type: 'text', placeholder: 'Username' }),
-        input({ class: 'form-control', id: 'loginPassword', type: 'password', placeholder: 'Password' }),
+      form({ class: 'login-form form-group' },
+        input({ 
+          class: 'form-control', 
+          id: 'loginUsername', 
+          type: 'text', 
+          placeholder: 'Username',
+          autocomplete: 'username',
+          autocapitalize: 'off',
+          autocorrect: 'off',
+          spellcheck: 'false'
+        }),
+        input({ 
+          class: 'form-control', 
+          id: 'loginPassword', 
+          type: 'password', 
+          placeholder: 'Password',
+          autocomplete: 'current-password'
+        }),
         button({ type: 'submit', onclick: (e) => this.handleLogin(e) }, 'Login')
       )
     )

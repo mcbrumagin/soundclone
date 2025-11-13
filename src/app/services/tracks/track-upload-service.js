@@ -4,6 +4,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { rawAudioDir } from '../../../lib/utils.js'
 import { setTrackMetadata } from '../../../lib/metadata-cache.js'
+import { createTrackMetadata, createProcessingMessage } from '../../../lib/track-metadata-model.js'
 import Logger from 'micro-js/logger'
 
 const logger = new Logger({ logGroup: 'track-upload-service' })
@@ -70,34 +71,21 @@ export default async function createTrackUploadService({
       const baseNameWithToken = path.basename(file.savedName, ext)
       const trackId = baseNameWithToken
       
-      // Generate all expected URLs
+      // Generate raw audio URL
       const rawAudioUrl = `/audio/raw/${file.savedName}`
-      const optimizedFileName = `${baseNameWithToken}.webm`
-      const waveformFileName = `${baseNameWithToken}.png`
-      const optimizedAudioUrl = `/audio/optimized/${optimizedFileName}`
-      const waveformUrl = `/images/waveforms/${waveformFileName}`
 
-      // Create initial track metadata with pending status
-      const trackData = {
+      // Create initial track metadata using domain model
+      const trackData = createTrackMetadata({
         id: trackId,
         title,
         description: description || '',
-
+        tags: [], // Empty tags array initially
         originalFileName: file.savedName,
         fileType: file.mimeType,
         fileSize: file.size,
-        
-        // All URLs - raw is immediate, optimized and waveform are added during processing
         rawAudioUrl,
-        optimizedAudioUrl: null,  // Will be set by internal-uploads when transcoding completes
-        waveformUrl: null,        // Will be set by internal-uploads when waveform completes
-
-        processingStatus: 'pending', // pending | processing | completed | failed
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        shareableLink: trackId,  // Same as id for simplicity
-        comments: []
-      }
+        processingStatus: 'pending'
+      })
       
       // Save initial metadata to cache
       await setTrackMetadata(trackId, trackData)
@@ -106,8 +94,11 @@ export default async function createTrackUploadService({
       logger.info(`Track uploaded successfully: ${trackData.title} (${trackId})`)
       logger.info(`Message ID: ${messageId}`)
       logger.info(`Raw audio URL: ${rawAudioUrl}`)
-      logger.info(`Expected optimized URL: ${optimizedAudioUrl}`)
-      logger.info(`Expected waveform URL: ${waveformUrl}`)
+      
+      // Generate processing message using domain model
+      const processingMessage = createProcessingMessage(trackData)
+      logger.info(`Expected optimized URL: ${processingMessage.optimizedAudioUrl}`)
+      logger.info(`Expected waveform URL: ${processingMessage.waveformUrl}`)
       
       // Send success response immediately
       const response = {
@@ -131,16 +122,10 @@ export default async function createTrackUploadService({
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(response))
       
-      // Publish message to trigger processing pipeline
+      // Publish message to trigger processing pipeline using domain model
       await publishMessage('transcodeAudio', {
         messageId,
-        trackId,
-        rawAudioUrl,           // URL for ffmpeg services to fetch raw audio
-        optimizedAudioUrl,     // Expected URL for transcoded output
-        waveformUrl,           // Expected URL for waveform output
-        optimizedFileName,     // Filename for transcoded file
-        waveformFileName,      // Filename for waveform file
-        timestamp: new Date().toISOString()
+        ...processingMessage
       })
 
       

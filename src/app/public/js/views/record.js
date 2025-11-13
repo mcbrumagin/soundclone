@@ -1,5 +1,6 @@
 import { htmlTags } from 'micro-js-html'
 import { uploadTrack, getTracks } from '../api.js'
+import { showAlert, showConfirm } from '../components/modal.js'
 
 const { main, h1, div, i, input, label, textarea, button, a } = htmlTags
 
@@ -96,7 +97,7 @@ export default class RecordView {
       window.renderApp()
     } catch (error) {
       console.error('Error accessing microphone:', error)
-      alert('Could not access microphone. Please ensure you have granted permission.')
+      await showAlert('Could not access microphone. Please ensure you have granted permission.', 'Microphone Error')
     }
   }
 
@@ -184,12 +185,12 @@ export default class RecordView {
     
     const title = titleInput?.value.trim()
     if (!title) {
-      alert('Please enter a title for your recording')
+      await showAlert('Please enter a title for your recording', 'Save Error')
       return
     }
     
     if (!this.recordingBlob) {
-      alert('No recording to save')
+      await showAlert('No recording to save', 'Save Error')
       return
     }
     
@@ -207,21 +208,22 @@ export default class RecordView {
       this.reset()
       
       // Refresh tracks list
-      window.tracks = await getTracks()
+      appState.tracks = await getTracks()
       
-      alert('Recording saved successfully!')
+      await showAlert('Recording saved successfully!', 'Success')
       
       // Navigate back to home and re-render
       window.location.hash = '#home'
       window.renderApp()
     } catch (error) {
       console.error('Error saving recording:', error)
-      alert('Failed to save recording. Please try again.')
+      await showAlert('Failed to save recording. Please try again.', 'Save Error')
     }
   }
 
-  discard() {
-    if (confirm('Are you sure you want to discard this recording?')) {
+  async discard() {
+    const confirmed = await showConfirm('Are you sure you want to discard this recording?', 'Discard Recording')
+    if (confirmed) {
       this.reset()
     }
   }

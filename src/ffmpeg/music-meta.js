@@ -92,6 +92,7 @@ async function processAudioMetadata(message) {
     
     // Merge extracted metadata into cache
     await mergeAndUpdateTrackMetadata(trackId, {
+      isFileAnalyzed: true,
       fileMetadata,
       duration: fileMetadata.duration || 0
     })
@@ -120,13 +121,13 @@ async function processAudioMetadata(message) {
   }
 }
 
-export default async function initializeMusicMetadataProcessor() {
-  logger.info('Initializing audio metadata service')
+export default async function initializeFileAnalysisProcessor() {
+  logger.info('Initializing file analysis service')
   
-  let metadataService = await createSubscriptionService('music-metadata-processor', 'audioTranscodeComplete', async (message) => {
-    logger.info('music-metadata-processor called with message:', message)
+  let fileAnalysisService = await createSubscriptionService('file-analysis-processor', 'audioTranscodeComplete', async (message) => {
+    logger.info('file-analysis-processor called with message:', message)
     await processAudioMetadata(message)
   })
 
-  return metadataService
+  return fileAnalysisService
 }

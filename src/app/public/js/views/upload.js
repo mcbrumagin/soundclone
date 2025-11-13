@@ -1,5 +1,6 @@
 import { htmlTags } from 'micro-js-html'
 import { uploadTrack, getTracks } from '../api.js'
+import { showAlert } from '../components/modal.js'
 
 const { main, h1, div, i, p, input, label, textarea, button, span, a } = htmlTags
 
@@ -49,7 +50,7 @@ export default class UploadView {
 
   async handleUpload() {
     if (!this.selectedFile) {
-      alert('Please select a file to upload')
+      await showAlert('Please select a file to upload', 'Upload Error')
       return
     }
     
@@ -58,7 +59,7 @@ export default class UploadView {
     
     const title = titleInput?.value.trim()
     if (!title) {
-      alert('Please enter a title for your track')
+      await showAlert('Please enter a title for your track', 'Upload Error')
       return
     }
     
@@ -78,28 +79,25 @@ export default class UploadView {
       console.log('Track uploaded successfully:', response)
       
       // Start polling for processing completion
-      this.uploadStatus = 'Processing audio (transcoding & metadata extraction)...'
+      this.uploadStatus = 'Processing audio (transcoding, waveform & metadata extraction)...'
       window.renderApp()
       
-      // TODO?
-      // await this.pollForCompletion(response.id)
-      
-      // Notify polling service to reset backoff and check immediately
+      // Notify polling service to track this upload and poll for completion
       if (appState.trackPollingService) {
-        appState.trackPollingService.notifyUpload()
+        appState.trackPollingService.notifyUpload(response.id)
       }
       
       // Reset form
       this.reset()
       
-      alert('Track processed successfully!')
+      await showAlert('Track processed successfully!', 'Success')
       
       // Navigate back to home and re-render
       window.location.hash = '#home'
       window.renderApp()
     } catch (error) {
       console.error('Error uploading track:', error)
-      alert('Failed to upload track. Please try again.')
+      await showAlert('Failed to upload track. Please try again.', 'Upload Error')
     } finally {
       this.uploading = false
       this.uploadStatus = null

@@ -6,6 +6,9 @@ class AudioPlayer {
     this.audio = new Audio()
     this.currentTrack = { id: 'N/A' }
     this.volume = 1
+    this.repeatMode = 'off' // 'off', 'all', 'one'
+    this.shuffleEnabled = false
+    this.shuffledPlaylist = [] // Store shuffled order
     
     this.setupEventListeners()
   }
@@ -73,8 +76,97 @@ class AudioPlayer {
     window.renderAudioButtons()
   }
 
-  toggle() {
-    return this.isPlaying ? this.pause() : this.play()
+  async toggle() {
+    if (this.isPlaying) {
+      this.pause()
+    } else {
+      // If no track loaded, try to load first track
+      if (!this.currentTrack || this.currentTrack.id === 'N/A') {
+        if (appState.tracks && appState.tracks.length > 0) {
+          await this.play(appState.tracks[0].id)
+        }
+      } else {
+        await this.play(this.currentTrack.id)
+      }
+    }
+  }
+  
+  toggleRepeat() {
+    // Cycle through: off -> all -> one -> off
+    if (this.repeatMode === 'off') {
+      this.repeatMode = 'all'
+    } else if (this.repeatMode === 'all') {
+      this.repeatMode = 'one'
+    } else {
+      this.repeatMode = 'off'
+    }
+    window.renderPlayer()
+    console.log('Repeat mode:', this.repeatMode)
+  }
+  
+  toggleShuffle() {
+    this.shuffleEnabled = !this.shuffleEnabled
+    
+    if (this.shuffleEnabled) {
+      // Create shuffled playlist
+      this.shufflePlaylist()
+    } else {
+      this.shuffledPlaylist = []
+    }
+    
+    window.renderPlayer()
+    console.log('Shuffle:', this.shuffleEnabled)
+  }
+  
+  shufflePlaylist() {
+    // Fisher-Yates shuffle
+    const tracks = [...appState.tracks]
+    for (let i = tracks.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [tracks[i], tracks[j]] = [tracks[j], tracks[i]]
+    }
+    this.shuffledPlaylist = tracks
+    console.log('Playlist shuffled')
+  }
+  
+  getNextTrack() {
+    if (!appState.tracks || appState.tracks.length === 0) return null
+    
+    if (this.repeatMode === 'one') {
+      return this.currentTrack
+    }
+    
+    const playlist = this.shuffleEnabled ? this.shuffledPlaylist : appState.tracks
+    if (playlist.length === 0) return null
+    
+    const currentIndex = playlist.findIndex(t => t.id === this.currentTrack?.id)
+    
+    if (currentIndex === -1) {
+      return playlist[0]
+    }
+    
+    const nextIndex = currentIndex + 1
+    
+    if (nextIndex < playlist.length) {
+      return playlist[nextIndex]
+    } else if (this.repeatMode === 'all') {
+      // Loop back to start
+      return playlist[0]
+    }
+    
+    return null // End of playlist
+  }
+  
+  async playNext() {
+    const nextTrack = this.getNextTrack()
+    if (nextTrack) {
+      console.log('Playing next track:', nextTrack.title)
+      await this.play(nextTrack.id)
+    } else {
+      console.log('No next track to play')
+      this.isPlaying = false
+      window.renderAudioButtons()
+    }
   }
 
   seek(time) {
@@ -175,10 +267,19 @@ class AudioPlayer {
       // window.renderApp()  // Re-render to update UI state
     })
 
-    this.audio.addEventListener('ended', data => {
+    this.audio.addEventListener('ended', async (data) => {
       console.log('ended event', data)
-      // window.renderPlayer()
-      window.renderAudioButtons()
+      this.isPlaying = false
+      
+      // Autoplay next track (if available)
+      const nextTrack = this.getNextTrack()
+      if (nextTrack) {
+        console.log('Auto-playing next track:', nextTrack.title)
+        await this.playNext()
+      } else {
+        console.log('No next track, playback ended')
+        window.renderAudioButtons()
+      }
     })
 
     this.audio.addEventListener('error', error => {
@@ -210,6 +311,30 @@ class AudioPlayer {
   renderPlayButton() {
     return span({}, this.isPlaying ? '⏸' : '▶')
   }
+  
+  renderRepeatButton() {
+    let icon = '↻'
+    let label = ''
+    if (this.repeatMode === 'all') {
+      icon = '🔁' // or use '↻'
+      label = ' All'
+    } else if (this.repeatMode === 'one') {
+      icon = '🔂' // or use '↻1'
+      label = ' One'
+    } else {
+      icon = '↻'
+      label = ''
+    }
+    return span({ 
+      style: this.repeatMode !== 'off' ? 'color: var(--primary-color);' : '' 
+    }, icon, label)
+  }
+  
+  renderShuffleButton() {
+    return span({ 
+      style: this.shuffleEnabled ? 'color: var(--primary-color);' : '' 
+    }, '🔀')
+  }
 
   render(track) {
     // init current track?
@@ -229,6 +354,20 @@ class AudioPlayer {
           onclick: () => this.toggle()
         }, 
           this.renderPlayButton()
+        ),
+        button({
+          class: 'player-control-btn',
+          title: 'Repeat',
+          onclick: () => this.toggleRepeat()
+        },
+          this.renderRepeatButton()
+        ),
+        button({
+          class: 'player-control-btn',
+          title: 'Shuffle',
+          onclick: () => this.toggleShuffle()
+        },
+          this.renderShuffleButton()
         ),
         div({ class: 'progress-container' },
           input({ 

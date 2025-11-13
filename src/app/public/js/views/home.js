@@ -84,6 +84,22 @@ export default class HomeView {
           `${new Date(track.createdAt).toLocaleDateString()} - ${formatTime(track.duration || 0)}`
         )
       ),
+      // Show tags if they exist
+      track.tags && track.tags.length > 0 ? div({ class: 'track-tags track-tags-compact' },
+        ...track.tags.slice(0, 3).map(tag => 
+          a({ 
+            class: 'track-tag track-tag-small',
+            href: `#search?tag=${encodeURIComponent(tag)}`,
+            onclick: (e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              console.log('Tag clicked:', tag)
+              // TODO: Wire up tag filtering/search
+            }
+          }, `#${tag}`)
+        ),
+        track.tags.length > 3 ? span({ class: 'track-tag-more' }, `+${track.tags.length - 3}`) : null
+      ) : null,
       div({ class: 'track-actions' },
         button({ 
           class: `play-track audio-control`,

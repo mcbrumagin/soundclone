@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "micro-js": "^0.2.10"
+    "micro-js": "^0.2.13",
+    "micro-js-html": "^0.0.8"
   }
 }

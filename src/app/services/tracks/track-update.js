@@ -3,7 +3,7 @@ import { mergeAndUpdateTrackMetadata } from '../../../lib/metadata-cache.js'
 export default async function updateTrack(payload, request) {
   try {
     console.log('updateTrack service called')
-    const { trackId, title, description } = payload || {}
+    const { trackId, title, description, tags } = payload || {}
     
     if (!trackId) {
       const error = new Error('Track ID is required')
@@ -15,6 +15,7 @@ export default async function updateTrack(payload, request) {
     const updates = {}
     if (title) updates.title = title
     if (description !== undefined) updates.description = description
+    if (tags !== undefined) updates.tags = tags
     
     // Merge updates into cache (atomic operation)
     const trackData = await mergeAndUpdateTrackMetadata(trackId, updates)
