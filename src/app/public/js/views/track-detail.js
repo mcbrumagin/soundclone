@@ -1,7 +1,8 @@
 import { htmlTags } from 'micro-js-html'
 import { getTrack, updateTrack, deleteTrack, addComment, updateComment, deleteComment } from '../api.js'
+import { showAlert, showConfirm, showPrompt, showTextareaPrompt, showEditTrackModal } from '../components/modal.js'
 
-const { main, h1, div, span, i, input, textarea, button, a, h2, p, img, hr } = htmlTags
+const { main, h1, div, span, i, input, textarea, button, a, h2, p, img, hr, em } = htmlTags
 
 export default class TrackDetailView {
   constructor() {
@@ -48,83 +49,140 @@ export default class TrackDetailView {
     } else console.warn('updateWaveformProgress: duration is 0', currentTime, duration)
   }
 
-  handleShare() {
-    if (this.currentTrack) {
-      const shareableLink = `${window.location.origin}/#track-detail/${this.currentTrack.id}`
+  async handleShare(track) {
+    // Use this.currentTrack if track is not provided
+    const targetTrack = track || this.currentTrack
+    if (targetTrack) {
+      const shareableLink = `${window.location.origin}/#track-detail/${targetTrack.id}`
       
       if (navigator.share) {
-        navigator.share({
-          title: this.currentTrack.title,
-          url: shareableLink
-        })
+        try {
+          await navigator.share({
+            title: targetTrack.title,
+            url: shareableLink
+          })
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            console.error('Share failed:', err)
+          }
+        }
       } else {
         // Fallback - copy to clipboard
-        navigator.clipboard.writeText(shareableLink).then(() => {
-          alert(`Link copied to clipboard: ${shareableLink}`)
-        }).catch(() => {
-          alert(`Shareable link: ${shareableLink}`)
-        })
+        try {
+          await navigator.clipboard.writeText(shareableLink)
+          await showAlert(`Link copied to clipboard!`, 'Share')
+        } catch (err) {
+          await showAlert(shareableLink, 'Share Link')
+        }
       }
-    }
+    } else console.warn('handleShare: no track to share')
   }
 
-  async handleEdit() {
-    if (this.currentTrack) {
-      const newTitle = prompt('Enter new title:', this.currentTrack.title)
-      if (newTitle !== null && newTitle.trim() !== '') {
-        const newDescription = prompt('Enter new description:', this.currentTrack.description || '')
+  async handleEdit(track) {
+    // Use this.currentTrack if track is not provided
+    const targetTrack = track || this.currentTrack
+    if (targetTrack) {
+      const result = await showEditTrackModal(targetTrack)
+      
+      if (result && result.title && result.title.trim() !== '') {
+        // Parse and normalize tags
+        const newTags = result.tags
+          .split(/[,\s]+/)
+          .map(tag => tag.trim().toLowerCase().replace(/\s+/g, '-'))
+          .filter(tag => tag.length > 0)
         
         try {
-          const updatedTrack = await updateTrack(this.currentTrack.id, {
-            title: newTitle,
-            description: newDescription !== null ? newDescription : this.currentTrack.description
+          const updatedTrack = await updateTrack(targetTrack.id, {
+            title: result.title.trim(),
+            description: result.description.trim(),
+            tags: newTags
           })
           console.log('Track updated successfully:', updatedTrack)
         
           // Update local state
           this.currentTrack = updatedTrack
+          
+          // Update in global tracks array
+          const trackIndex = appState.tracks.findIndex(t => t.id === targetTrack.id)
+          if (trackIndex !== -1) {
+            appState.tracks[trackIndex] = updatedTrack
+          }
+          
           window.renderApp()
         } catch (error) {
           console.error('Error updating track:', error)
-          alert('Failed to update track. Please try again.')
+          await showAlert('Failed to update track. Please try again.', 'Error')
+        }
+      } else if (result) {
+        await showAlert('Title is required', 'Error')
+      }
+    } else console.warn('handleEdit: no track to edit')
+  }
+
+  async handleDelete(track) {
+    // Use this.currentTrack if track is not provided
+    const targetTrack = track || this.currentTrack
+    if (targetTrack) {
+      const confirmed = await showConfirm(
+        `Are you sure you want to delete "${targetTrack.title}"? This action cannot be undone.`,
+        'Delete Track'
+      )
+      
+      if (confirmed) {
+        try {
+          await deleteTrack(targetTrack.id)
+          console.log('Track deleted successfully')
+          
+          // Stop player if currently playing this track
+          if (appState.player.currentTrack?.id === targetTrack.id) {
+            appState.player.pause()
+            appState.player.currentTrack = null
+          }
+          
+          // Clear selected track if it matches
+          if (appState.selectedTrackId === targetTrack.id) {
+            appState.selectedTrackId = null
+          }
+          
+          // Remove from global tracks array
+          appState.tracks = appState.tracks.filter(t => t.id !== targetTrack.id)
+          
+          await showAlert('Track deleted successfully!', 'Success')
+          window.location.hash = '#home' // doesn't guarantee re-render
+          window.renderApp()
+        } catch (error) {
+          console.error('Error deleting track:', error)
+          await showAlert('Failed to delete track. Please try again.', 'Error')
         }
       }
-    }
+    } else console.warn('handleDelete: no track to delete')
   }
 
-  async handleDelete() {
-    if (this.currentTrack && confirm('Are you sure you want to delete this track?')) {
-      try {
-        await deleteTrack(this.currentTrack.id)
-        console.log('Track deleted successfully')
-        
-        alert('Track deleted successfully!')
-        window.location.hash = '#home'
-      } catch (error) {
-        console.error('Error deleting track:', error)
-        alert('Failed to delete track. Please try again.')
-      }
+  async handleAddComment(track) {
+    const isLoggedIn = !!appState.accessToken
+    
+    if (!isLoggedIn) {
+      await showAlert('You must be logged in to add comments', 'Login Required')
+      return
     }
-  }
-
-  async handleAddComment() {
+    
     const commentInput = document.getElementById('commentInput')
     const commentText = commentInput?.value.trim()
     
     if (commentText) {
       try {
-        const newComment = await addComment(this.currentTrack.id, commentText)
+        const newComment = await addComment(track.id, commentText)
         console.log('Comment added successfully:', newComment)
         
-        this.comments.push(newComment)
+        track.comments.push(newComment)
         commentInput.value = ''
         
         window.renderApp()
       } catch (error) {
         console.error('Error adding comment:', error)
-        alert('Failed to add comment. Please try again.')
+        await showAlert('Failed to add comment. Please try again.', 'Error')
       }
-    }
+    } else console.warn('handleAddComment: no comment text')
   }
 
   startEditingComment(commentId, currentText) {
@@ -141,17 +199,17 @@ export default class TrackDetailView {
     window.renderApp()
   }
 
-  async saveCommentEdit() {
+  async saveCommentEdit(track) {
     if (!this.editingCommentId) return
     
     console.log('Save comment edit:', this.editingCommentId, this.editingCommentText)
     
     try {
-      await updateComment(this.currentTrack.id, this.editingCommentId, this.editingCommentText)
+      await updateComment(track.id, this.editingCommentId, this.editingCommentText)
       console.log('Comment updated successfully')
       
       // Update local comment in track data
-      const comment = this.currentTrack.comments.find(c => c.id === this.editingCommentId)
+      const comment = track.comments.find(c => c.id === this.editingCommentId)
       if (comment) {
         comment.text = this.editingCommentText
         comment.updatedAt = new Date().toISOString()
@@ -162,26 +220,27 @@ export default class TrackDetailView {
       window.renderApp()
     } catch (error) {
       console.error('Failed to update comment:', error)
-      alert('Failed to update comment')
+      await showAlert('Failed to update comment', 'Error')
     }
   }
 
-  async handleCommentDelete(commentId) {
-    if (!confirm('Are you sure you want to delete this comment?')) return
+  async handleCommentDelete(track, commentId) {
+    const confirmed = await showConfirm('Are you sure you want to delete this comment?', 'Delete Comment')
+    if (!confirmed) return
     
     console.log('Delete comment:', commentId)
     
     try {
-      await deleteComment(this.currentTrack.id, commentId)
+      await deleteComment(track.id, commentId)
       console.log('Comment deleted successfully')
       
       // Remove comment from local data
-      this.currentTrack.comments = this.currentTrack.comments.filter(c => c.id !== commentId)
+      track.comments = track.comments.filter(c => c.id !== commentId)
       
       window.renderApp()
     } catch (error) {
       console.error('Failed to delete comment:', error)
-      alert('Failed to delete comment')
+      await showAlert('Failed to delete comment', 'Error')
     }
   }
 
@@ -221,9 +280,10 @@ export default class TrackDetailView {
     }
   }
 
-  renderComment(comment) {
+  renderComment(track, comment) {
     const formattedDate = new Date(comment.timestamp).toLocaleDateString()
     const isEditing = this.editingCommentId === comment.id
+    const isLoggedIn = !!appState.accessToken
     
     // If editing this comment, show textarea with save/cancel
     if (isEditing) {
@@ -242,7 +302,7 @@ export default class TrackDetailView {
         div({ class: 'comment-actions' },
           button({
             class: 'save-comment',
-            onclick: () => this.saveCommentEdit()
+            onclick: () => this.saveCommentEdit(track)
           }, 'Save'),
           button({
             class: 'secondary cancel-edit',
@@ -271,32 +331,44 @@ export default class TrackDetailView {
         div({ class: 'comment-date' }, formattedDate)
       ),
       div({ class: 'comment-text' }, commentText),
-      div({ class: 'comment-actions' },
+      isLoggedIn ? div({ class: 'comment-actions' },
         button({
           class: 'secondary edit-comment',
           onclick: () => this.startEditingComment(comment.id, comment.text)
         }, 'Edit'),
         button({
           class: 'secondary delete-comment',
-          onclick: () => this.handleCommentDelete(comment.id)
+          onclick: () => this.handleCommentDelete(track, comment.id)
         }, 'Delete')
+      ) : null
+    )
+  }
+
+  renderTags(tags) {
+    if (!tags || tags.length === 0) return null
+    
+    return div({ class: 'track-tags' },
+      ...tags.map(tag => 
+        a({ 
+          class: 'track-tag',
+          href: `#search?tag=${encodeURIComponent(tag)}`,
+          onclick: (e) => {
+            e.preventDefault()
+            console.log('Tag clicked:', tag)
+            // TODO: Wire up tag filtering/search
+          }
+        }, `#${tag}`)
       )
     )
   }
 
   render(track) {
     console.log('track detail view render', track)
+    // Store current track for methods to access
+    this.currentTrack = track
     const formattedDate = new Date(track.createdAt).toLocaleDateString()
+    const isLoggedIn = !!appState.accessToken
 
-    setTimeout(() => {
-      
-      console.log('track detail view render timeout', track)
-
-      // TODO messy but seems to work
-      if (!appState.isPlaying && appState.player.currentTrack?.id === track.id) {
-        appState.player.play(track.id)
-      }
-    }, 100)
     return main({ class: 'container' },
       a({ class: 'back-button', 'data-view': 'home', href: '#home' },
         i({ class: 'fas fa-arrow-left' }), ' Back to Home'
@@ -306,17 +378,42 @@ export default class TrackDetailView {
       div({ class: 'track-detail', id: 'trackDetail' },
         div({ class: 'track-detail-header' },
           div({ class: 'track-info' },
-            p({ class: 'track-description' }, track.description || 'No description'),
+            this.renderTags(track.tags),
             p({ class: 'track-meta' }, `Created: ${formattedDate}`)
           ),
           div({ class: 'track-actions' },
-            button({ id: 'shareButton', onclick: () => this.handleShare() },
+            button({ 
+              id: 'shareButton', 
+              onclick: () => this.handleShare(track) 
+            },
               i({ class: 'fas fa-share-alt' }), ' Share'
             ),
-            button({ class: 'secondary', id: 'editButton', onclick: () => this.handleEdit() },
+            button({ 
+              class: 'secondary', 
+              id: 'editButton', 
+              disabled: !isLoggedIn,
+              onclick: async () => {
+                if (!isLoggedIn) {
+                  await showAlert('You must be logged in to edit tracks', 'Login Required')
+                } else {
+                  this.handleEdit(track)
+                }
+              }
+            },
               i({ class: 'fas fa-edit' }), ' Edit'
             ),
-            button({ class: 'secondary', id: 'deleteButton', onclick: () => this.handleDelete() },
+            button({ 
+              class: 'secondary', 
+              id: 'deleteButton', 
+              disabled: !isLoggedIn,
+              onclick: async () => {
+                if (!isLoggedIn) {
+                  await showAlert('You must be logged in to delete tracks', 'Login Required')
+                } else {
+                  this.handleDelete(track)
+                }
+              }
+            },
               i({ class: 'fas fa-trash' }), ' Delete'
             )
           )
@@ -362,7 +459,7 @@ export default class TrackDetailView {
           src: track.waveformUrl,
           alt: 'Waveform',
           class: 'waveform-image'
-        }) : div({ class: 'waveform-image' }, '...still processing waveform...'),
+        }) : div({ class: 'waveform-placeholder' }, em('..... still processing waveform .....')),
         // Only show progress if this is the currently playing track
         div({ 
           class: 'waveform-progress', 
@@ -374,20 +471,29 @@ export default class TrackDetailView {
           };`
         })
       ),
+      div({ class: 'track-description-section' },
+        h2({}, 'About'),
+        p({ class: 'track-description' }, track.description || 'No description available')
+      ),
       div({ class: 'comments-section' },
         h2({}, 'Comments'),
         div({ class: 'comment-form' },
           textarea({ 
             class: 'comment-input', 
             id: 'commentInput', 
-            placeholder: 'Add a comment... Use @mm:ss to tag a timestamp'
+            placeholder: isLoggedIn ? 'Add a comment... Use @mm:ss to tag a timestamp' : 'Log in to add comments',
+            disabled: !isLoggedIn
           }),
-          button({ id: 'addCommentButton', onclick: () => this.handleAddComment() }, 'Add Comment')
+          button({ 
+            id: 'addCommentButton', 
+            disabled: !isLoggedIn,
+            onclick: () => this.handleAddComment(track) 
+          }, 'Add Comment')
         ),
         div({ class: 'comment-list', id: 'commentList' },
           track.comments.length === 0 
             ? div({ class: 'empty-state' }, 'No comments yet. Be the first to comment!')
-            : track.comments.map(comment => this.renderComment(comment))
+            : track.comments.map(comment => this.renderComment(track, comment))
         )
       )
     )

@@ -5,13 +5,12 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node src/server.js"
+    "start": "./run.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.540.0",
     "busboy": "^1.6.0",
-    "micro-js": "^0.2.11",
-    "micro-js-html": "^0.0.6"
+    "micro-js": "^0.2.13",
+    "micro-js-html": "^0.0.8"
   }
 }

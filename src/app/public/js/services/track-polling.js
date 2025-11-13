@@ -10,6 +10,16 @@ class TrackPollingService {
     this.isPolling = false
     this.lastTrackCount = 0
     this.lastTrackIds = new Set()
+    
+    // Track uploads that are pending processing
+    // Map of trackId -> { uploadedAt: timestamp }
+    this.pendingUploads = new Map()
+    
+    // Track previous waveform states to detect when they become available
+    // Map of trackId -> { isTranscoded: boolean, isWaveformGenerated: boolean }
+    this.previousStates = new Map()
+    
+    this.isSuspended = false
   }
 
   start(onNewTracks) {
@@ -37,6 +47,12 @@ class TrackPollingService {
 
   scheduleNextPoll() {
     if (!this.isPolling) return
+    
+    // Don't schedule if suspended
+    if (this.isSuspended) {
+      console.log('Polling suspended, not scheduling next poll')
+      return
+    }
 
     this.timeoutId = setTimeout(async () => {
       await this.poll()
@@ -70,15 +86,85 @@ class TrackPollingService {
         }
       }
       
+      // Track if any waveforms became available (for rerender)
+      let waveformsBecameAvailable = false
+      
+      // Check status of pending uploads and track state changes
+      let allPendingComplete = true
+      
+      for (const track of tracks) {
+        const trackId = track.id
+        const previousState = this.previousStates.get(trackId)
+        const currentState = {
+          isTranscoded: track.isTranscoded || false,
+          isWaveformGenerated: track.isWaveformGenerated || false
+        }
+        
+        // Detect when transcode completes
+        if (previousState && !previousState.isTranscoded && currentState.isTranscoded) {
+          console.log(`✓ Transcoding complete for track ${trackId}`)
+        }
+        
+        // Detect when waveform generation completes
+        if (previousState && !previousState.isWaveformGenerated && currentState.isWaveformGenerated) {
+          console.log(`✓ Waveform generated for track ${trackId}`)
+          waveformsBecameAvailable = true
+        }
+        
+        // Update previous state
+        this.previousStates.set(trackId, currentState)
+        
+        // Check if this track is pending processing
+        const pendingStatus = this.pendingUploads.get(trackId)
+        if (pendingStatus) {
+          // Track is complete if both transcode and waveform are done (or timeout after 5 minutes)
+          const isComplete = (currentState.isTranscoded && currentState.isWaveformGenerated) || 
+            (Date.now() - pendingStatus.uploadedAt > 5 * 60 * 1000)
+          
+          if (!isComplete) {
+            allPendingComplete = false
+            // Log progress
+            const status = []
+            if (!currentState.isTranscoded) status.push('transcoding')
+            if (!currentState.isWaveformGenerated) status.push('waveform')
+            console.log(`⏳ Track ${trackId} processing: ${status.join(', ')}`)
+          } else if (isComplete) {
+            console.log(`✓ Processing complete for track ${trackId}`)
+            // Remove from pending if fully complete
+            this.pendingUploads.delete(trackId)
+          }
+        }
+      }
+      
+      // Trigger rerender if any waveforms became available
+      if (waveformsBecameAvailable) {
+        console.log('Waveforms updated, triggering rerender')
+        if (window.renderApp) {
+          window.renderApp()
+        }
+      }
+      
       // Update state
       this.lastTrackCount = tracks.length
       this.lastTrackIds = currentTrackIds
       
-      // Increase interval (exponential backoff)
-      this.currentInterval = Math.min(
-        this.currentInterval * this.backoffMultiplier,
-        this.maxInterval
-      )
+      // If all pending uploads are complete, suspend polling
+      if (this.pendingUploads.size > 0 && allPendingComplete) {
+        console.log('All pending uploads complete, suspending polling')
+        this.isSuspended = true
+        this.pendingUploads.clear()
+      }
+      
+      // Increase interval (exponential backoff) if not actively processing uploads
+      if (this.pendingUploads.size === 0) {
+        this.currentInterval = Math.min(
+          this.currentInterval * this.backoffMultiplier,
+          this.maxInterval
+        )
+      } else {
+        // Keep fast polling while processing
+        console.log(`Pending uploads: ${this.pendingUploads.size}`)
+      }
       
     } catch (error) {
       console.error('Error polling for tracks:', error)
@@ -99,9 +185,23 @@ class TrackPollingService {
   }
 
   // Call this after a user uploads a track
-  notifyUpload() {
-    console.log('Upload detected, resetting polling interval')
-    this.resetBackoff()
+  notifyUpload(trackId) {
+    console.log(`Upload detected for track ${trackId}, adding to pending uploads`)
+    
+    // Add to pending uploads
+    this.pendingUploads.set(trackId, {
+      uploadedAt: Date.now()
+    })
+    
+    // Resume polling if suspended
+    if (this.isSuspended) {
+      console.log('Resuming polling for new upload')
+      this.isSuspended = false
+      this.resetBackoff()
+    } else {
+      this.resetBackoff()
+    }
+    
     // Force an immediate poll
     if (this.timeoutId) {
       clearTimeout(this.timeoutId)

@@ -9,7 +9,7 @@ export async function getTrackMetadata(trackId) {
   logger.debug('getTrackMetadata called with trackId:', trackId)
   try {
     const result = await callService('cache-service', { get: trackId })
-    logger.warn('getTrackMetadata result:', result)
+    // logger.warn('getTrackMetadata result:', result)
     return result || null
   } catch (error) {
     console.error(`Failed to get track metadata for ${trackId}:`, error)
@@ -73,7 +73,14 @@ export async function mergeAndUpdateTrackMetadata(trackId, updates) {
  */
 export async function deleteTrackMetadata(trackId) {
   try {
-    return await callService('cache-service', { del: trackId })
+    const result = await callService('cache-service', { del: trackId })
+    
+    // Publish event so S3 backup service can delete metadata from S3
+    await publishMessage('track-metadata-deleted', {
+      trackId
+    })
+    
+    return result
   } catch (error) {
     console.error(`Failed to delete track metadata for ${trackId}:`, error)
     return false

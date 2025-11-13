@@ -6,6 +6,7 @@ import { createSubscriptionService, publishMessage } from 'micro-js'
 import { mergeAndUpdateTrackMetadata } from '../lib/metadata-cache.js'
 import { uploadFile } from '../lib/upload-helper.js'
 import Logger from 'micro-js/logger'
+import { getTrackFilenames } from '../lib/track-metadata-model.js'
 
 const logger = new Logger({ logGroup: 'waveform-generator' })
 
@@ -102,6 +103,7 @@ async function generateWaveform(audioFileUrl, outputFileName, options = {}) {
 async function updateMetadataWithWaveform(trackId, waveformFileName) {
   try {
     await mergeAndUpdateTrackMetadata(trackId, {
+      isWaveformGenerated: true,
       updatedAt: new Date().toISOString(),
       waveformUrl: `/images/waveforms/${waveformFileName}`
     })
@@ -115,23 +117,23 @@ async function updateMetadataWithWaveform(trackId, waveformFileName) {
 
 /**
  * Process waveform generation request
- * @param {Object} message - Message from pubsub
+ * @param {Object} message - Message from pubsub (audioTranscodeComplete)
  */
 async function processWaveformGeneration(message) {
   const { messageId, trackId, transcodedFileUrl } = message
   
   logger.info(`[${messageId}] Generating waveform for track ${trackId}`)
   
+  // Get predictable waveform filename from domain model
+  const { waveformFileName } = getTrackFilenames(trackId)
+  
+  logger.debug(`Input: ${transcodedFileUrl}`)
+  logger.debug(`Output: ${waveformFileName}`)
+  
   let tempDir = null
   
   try {
-    // Extract filename from URL for waveform naming
-    const transcodedFileName = transcodedFileUrl.split('/').pop()
-    const baseName = path.basename(transcodedFileName, path.extname(transcodedFileName))
-    const waveformFileName = `${baseName}.png`
-    
     // Generate waveform image
-    logger.warn('generating waveform', transcodedFileUrl, waveformFileName)
     const result = await generateWaveform(transcodedFileUrl, waveformFileName)
     
     if (!result.success) {
@@ -146,6 +148,7 @@ async function processWaveformGeneration(message) {
       originalName: waveformFileName
     })
     
+    // Update metadata with waveform URL (predictable from trackId)
     await updateMetadataWithWaveform(trackId, waveformFileName)
     
     logger.info(`[${messageId}] Waveform generation complete`)

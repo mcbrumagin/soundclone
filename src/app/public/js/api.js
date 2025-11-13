@@ -38,14 +38,25 @@ const SERVICE_REGISTRY_URL = window.location.origin
 
 const callService = async (serviceName, payload = {}) => {
   console.log('callService', serviceName, payload)
+  let body
+  let headers = {}
+  if (payload?.headers) {
+    headers = payload.headers
+    delete payload.headers
+    body = payload.body
+  } else {
+    body = payload
+    delete payload.body
+  }
   const response = await fetch(SERVICE_REGISTRY_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'micro-command': 'service-call',
-      'micro-service-name': serviceName
+      'micro-service-name': serviceName,
+      ...headers
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(body)
   })
   
   if (!response.ok) {
@@ -78,6 +89,35 @@ export const getTrack = async trackId => {
   const json = await callService('getTrackDetail', { trackId })
   return json.track
 }
+
+// Audio file access
+export const getAudioFile = async trackId => {
+  const response = await callService('getAudioFile', { trackId })
+  return response // Returns the fetch response for binary data
+}
+
+// For creating audio URLs for HTML audio elements
+export const getAudioUrl = trackId => {
+  // Create a blob URL approach or use a data URL
+  // This is a simplified approach - in production you might want to cache these
+  return `${SERVICE_REGISTRY_URL}/service/getAudioFile`
+}
+
+// Audio metadata
+export const getTrackMetadata = async (trackId) => {
+  const json = await callService('getTrackMetadata', { trackId })
+  return json
+}
+
+// Health check
+export const getHealth = async () => {
+  const json = await callService('getHealth')
+  return json
+}
+
+
+
+// -------------authorization required services--------------------------------
 
 // Audio upload using multipart form data
 export const uploadTrack = async (audioFile, title, description, onProgress = null) => {
@@ -139,53 +179,43 @@ export const uploadTrack = async (audioFile, title, description, onProgress = nu
 }
 
 export const updateTrack = async (trackId, data) => {
-  const json = await callService('updateTrack', { trackId, ...data })
+  const json = await callService('updateTrack', {
+    body: { trackId, ...data },
+    headers: { 'micro-auth-token': appState.accessToken }
+  })
   return json.track
 }
 
 export const deleteTrack = async trackId => {
-  const json = await callService('deleteTrack', { trackId })
+  const json = await callService('deleteTrack', {
+    body: { trackId },
+    headers: { 'micro-auth-token': appState.accessToken }
+  })
   return json
 }
 
 // Comment operations
 export const addComment = async (trackId, text) => {
   console.log('addComment', trackId, text)
-  const json = await callService('createComment', { trackId, text })
+  const json = await callService('createComment', {
+    body: { trackId, text },
+    headers: { 'micro-auth-token': appState.accessToken }
+  })
   return json.comment
 }
 
 export const updateComment = async (trackId, commentId, text) => {
-  const json = await callService('updateComment', { trackId, commentId, text })
+  const json = await callService('updateComment', {
+    body: { trackId, commentId, text },
+    headers: { 'micro-auth-token': appState.accessToken }
+  })
   return json.comment
 }
 
 export const deleteComment = async (trackId, commentId) => {
-  const json = await callService('deleteComment', { trackId, commentId })
+  const json = await callService('deleteComment', {
+    body: { trackId, commentId },
+    headers: { 'micro-auth-token': appState.accessToken }
+  })
   return json
 }
-
-// Audio file access
-export const getAudioFile = async trackId => {
-  const response = await callService('getAudioFile', { trackId })
-  return response // Returns the fetch response for binary data
-}
-
-// For creating audio URLs for HTML audio elements
-export const getAudioUrl = trackId => {
-  // Create a blob URL approach or use a data URL
-  // This is a simplified approach - in production you might want to cache these
-  return `${SERVICE_REGISTRY_URL}/service/getAudioFile`
-}
-
-// Audio metadata
-export const getTrackMetadata = async (trackId) => {
-  const json = await callService('getTrackMetadata', { trackId })
-  return json
-}
-
-// Health check
-export const getHealth = async () => {
-  const json = await callService('getHealth')
-  return json
-} 

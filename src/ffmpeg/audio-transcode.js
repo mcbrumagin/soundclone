@@ -7,6 +7,7 @@ import { uploadFile } from '../lib/upload-helper.js'
 import Logger from 'micro-js/logger'
 import { mergeAndUpdateTrackMetadata } from '../lib/metadata-cache.js'
 import { retry } from '../lib/async-helpers.js'
+import { getTrackFilenames } from '../lib/track-metadata-model.js'
 
 const logger = new Logger({ logGroup: 'audio-transcode' })
 
@@ -153,23 +154,31 @@ async function transcodeToOpus(inputUrl, outputFileName) {
 
 /**
  * Process audio transcode request
- * @param {Object} message - Message from pubsub
+ * @param {Object} message - Processing message from domain model
  */
 async function processAudioTranscode(message) {
-  const { messageId, trackId, rawAudioUrl } = message
+  // Extract properties from processing message (created by createProcessingMessage)
+  const { 
+    messageId, 
+    trackId, 
+    rawAudioUrl,
+    optimizedAudioUrl,
+    optimizedFileName
+  } = message
   
-  // Extract filename from URL
-  const rawAudioFileName = rawAudioUrl.split('/').pop()
-  const transcodedFileName = `${rawAudioFileName.split('.')[0]}.webm`
   logger.info(`[${messageId}] Processing transcode for track ${trackId}`)
+  logger.debug(`Input: ${rawAudioUrl}`)
+  logger.debug(`Output: ${optimizedFileName}`)
+  
+  // Verify we have the expected filename from domain model
+  const { optimizedFileName: expectedFileName } = getTrackFilenames(trackId)
+  if (optimizedFileName !== expectedFileName) {
+    logger.warn(`Filename mismatch: expected ${expectedFileName}, got ${optimizedFileName}`)
+  }
   
   let tempDir = null
   
-  // TODO retry
-
-  
   try {
-
     let result
     await retry(async () => {
       // Check if already high-quality Opus
@@ -177,10 +186,10 @@ async function processAudioTranscode(message) {
       
       if (alreadyOpus) {
         logger.info(`[${messageId}] File already high-quality Opus, transcoding anyway`)
-        result = await transcodeToOpus(rawAudioUrl, transcodedFileName)
+        result = await transcodeToOpus(rawAudioUrl, optimizedFileName)
       } else {
         logger.info(`[${messageId}] Transcoding to Opus (WebM container)`)
-        result = await transcodeToOpus(rawAudioUrl, transcodedFileName)
+        result = await transcodeToOpus(rawAudioUrl, optimizedFileName)
       }
       
       if (!result.success) {
@@ -193,18 +202,18 @@ async function processAudioTranscode(message) {
       shouldRetry: (err) => err.message.includes('404')
     })
     
-    
     tempDir = result.tempDir
     
     // Upload transcoded file to main service
-    // TODO double check the upload event does not trigger a loop
     logger.info(`[${messageId}] Uploading transcoded file to main service`)
     await uploadFile('transcoded-audio-upload-service', result.tempFilePath, {
-      originalName: transcodedFileName
+      originalName: optimizedFileName
     })
 
+    // Update metadata with optimized audio URL (from domain model)
     await mergeAndUpdateTrackMetadata(trackId, {
-      optimizedAudioUrl: `/audio/optimized/${transcodedFileName}`,
+      isTranscoded: true,
+      optimizedAudioUrl,
       updatedAt: new Date().toISOString()
     })
     
@@ -212,7 +221,7 @@ async function processAudioTranscode(message) {
     await publishMessage('audioTranscodeComplete', {
       messageId,
       trackId,
-      transcodedFileUrl: `/audio/optimized/${transcodedFileName}`, // URL for waveform generator to fetch
+      transcodedFileUrl: optimizedAudioUrl, // URL for waveform generator to fetch
       timestamp: new Date().toISOString()
     })
     

@@ -45,11 +45,11 @@ import { ensureDataDirectories } from '../lib/utils.js'
 
 // ---external services----------------------------------------------
 async function importAtRunTime() {
-  return [
+  return await Promise.all([
     (await import('../ffmpeg/music-meta.js')).default,
     (await import('../ffmpeg/audio-transcode.js')).default,
     (await import('../ffmpeg/waveform-generator.js')).default
-  ]
+  ].map(init => init()))
 }
 
 // ---setup system---------------------------------------------------
@@ -110,12 +110,13 @@ async function startServer() {
       '/health': getHealth,
       '/getTrackList': getTrackList,
       '/getTrackDetail': getTrackDetail,
-      '/updateTrack': updateTrack,
-      '/deleteTrack': deleteTrack,
-      '/createComment': createComment,
-      '/updateComment': updateComment,
-      '/deleteComment': deleteComment,
       '/getTrackMetadata': getTrackMetadataFromCache,
+
+      '/updateTrack': await createService(updateTrack, { useAuthService: 'auth-service'}),
+      '/deleteTrack': await createService(deleteTrack, { useAuthService: 'auth-service'}),
+      '/createComment': await createService(createComment, { useAuthService: 'auth-service'}),
+      '/updateComment': await createService(updateComment, { useAuthService: 'auth-service'}),
+      '/deleteComment': await createService(deleteComment, { useAuthService: 'auth-service'}),
       '/uploadTrack': await createTrackUploadService({
         serviceName: 'track-upload-service',
         useAuthService: 'auth-service',
@@ -123,6 +124,7 @@ async function startServer() {
         updateChannel: 'micro:file-updated',
         urlPathPrefix: '/audio/raw'
       }),
+      
       '/*': await createStaticFileService({
         rootDir: path.join(__dirname, 'public'),
         urlRoot: '/',
