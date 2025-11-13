@@ -24,6 +24,8 @@ export function createTrackMetadata({
   duration = null,
   realDuration = null,
   processingStatus = 'pending',
+  isTranscoded = false,
+  isWaveformGenerated = false,
   createdAt = new Date().toISOString(),
   updatedAt = new Date().toISOString(),
   comments = []
@@ -52,6 +54,8 @@ export function createTrackMetadata({
     
     // Processing
     processingStatus, // 'pending' | 'processing' | 'completed' | 'failed'
+    isTranscoded, // Whether audio transcoding is complete
+    isWaveformGenerated, // Whether waveform image is generated
     
     // Timestamps
     createdAt,

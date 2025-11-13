@@ -8,8 +8,6 @@ class TrackPollingService {
     this.backoffMultiplier = 1.5
     this.timeoutId = null
     this.isPolling = false
-    this.lastTrackCount = 0
-    this.lastTrackIds = new Set()
     
     // Track uploads that are pending processing
     // Map of trackId -> { uploadedAt: timestamp }
@@ -66,29 +64,6 @@ class TrackPollingService {
     try {
       const tracks = await getTracks()
       
-      // Create set of current track IDs
-      const currentTrackIds = new Set(tracks.map(t => t.id))
-      
-      // Check if there are new tracks
-      const hasNewTracks = this.lastTrackCount === 0 || 
-        tracks.length !== this.lastTrackCount ||
-        !this.areSetsSame(currentTrackIds, this.lastTrackIds)
-      
-      if (hasNewTracks && this.lastTrackCount > 0) {
-        console.log('New tracks detected!', {
-          oldCount: this.lastTrackCount,
-          newCount: tracks.length
-        })
-        
-        // Call the callback with new tracks
-        if (this.onNewTracks) {
-          this.onNewTracks(tracks)
-        }
-      }
-      
-      // Track if any waveforms became available (for rerender)
-      let waveformsBecameAvailable = false
-      
       // Check status of pending uploads and track state changes
       let allPendingComplete = true
       
@@ -103,12 +78,18 @@ class TrackPollingService {
         // Detect when transcode completes
         if (previousState && !previousState.isTranscoded && currentState.isTranscoded) {
           console.log(`✓ Transcoding complete for track ${trackId}`)
+          if (this.onNewTracks) {
+            this.onNewTracks(tracks)
+          }
+          // this.isTranscodingComplete = true // TODO?
         }
         
         // Detect when waveform generation completes
         if (previousState && !previousState.isWaveformGenerated && currentState.isWaveformGenerated) {
           console.log(`✓ Waveform generated for track ${trackId}`)
-          waveformsBecameAvailable = true
+          if (this.onNewTracks) {
+            this.onNewTracks(tracks)
+          }
         }
         
         // Update previous state
@@ -136,18 +117,6 @@ class TrackPollingService {
         }
       }
       
-      // Trigger rerender if any waveforms became available
-      if (waveformsBecameAvailable) {
-        console.log('Waveforms updated, triggering rerender')
-        if (window.renderApp) {
-          window.renderApp()
-        }
-      }
-      
-      // Update state
-      this.lastTrackCount = tracks.length
-      this.lastTrackIds = currentTrackIds
-      
       // If all pending uploads are complete, suspend polling
       if (this.pendingUploads.size > 0 && allPendingComplete) {
         console.log('All pending uploads complete, suspending polling')
@@ -174,14 +143,6 @@ class TrackPollingService {
         this.maxInterval
       )
     }
-  }
-
-  areSetsSame(set1, set2) {
-    if (set1.size !== set2.size) return false
-    for (const item of set1) {
-      if (!set2.has(item)) return false
-    }
-    return true
   }
 
   // Call this after a user uploads a track
