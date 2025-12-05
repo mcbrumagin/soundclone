@@ -1,4 +1,4 @@
-export MICRO_REGISTRY_URL=http://localhost:4000
+export YAMF_REGISTRY_URL=http://localhost:4000
 export ENVIRONMENT=local
 # export DISABLE_ALL_CUSTOM_LOGS=true
 export LOG_LEVEL=info

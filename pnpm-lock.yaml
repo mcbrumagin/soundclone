@@ -1,0 +1,108 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@yamf/client':
+        specifier: 0.1.0
+        version: 0.1.0
+      '@yamf/core':
+        specifier: 0.3.2
+        version: 0.3.2(@yamf/client@0.1.0)
+      '@yamf/services-auth':
+        specifier: 0.1.2
+        version: 0.1.2(@yamf/core@0.3.2(@yamf/client@0.1.0))(@yamf/services-cache@0.1.2(@yamf/core@0.3.2(@yamf/client@0.1.0)))
+      '@yamf/services-cache':
+        specifier: 0.1.2
+        version: 0.1.2(@yamf/core@0.3.2(@yamf/client@0.1.0))
+      '@yamf/services-file-server':
+        specifier: 0.1.2
+        version: 0.1.2(@yamf/core@0.3.2(@yamf/client@0.1.0))
+      '@yamf/services-file-upload':
+        specifier: 0.1.2
+        version: 0.1.2(@yamf/core@0.3.2(@yamf/client@0.1.0))
+
+packages:
+
+  '@yamf/client@0.1.0':
+    resolution: {integrity: sha512-z4Ose/HOKGjIWiNp7gPY3nND1ml4TABS42Y780vPK51W2/pc97NLuftN/viopJdOr1uwJbQ9kehNvAYL0G8zGA==}
+    engines: {node: '>=20.0.0'}
+
+  '@yamf/core@0.3.2':
+    resolution: {integrity: sha512-qHbIYROWcnSPJsoN6eT/R0Uyi3tbzI6Bfs6bBFwxtY7VlfEeFRr/beEPu5xxeJqKQmIvxeyWHHOdEyofBv6uGQ==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@yamf/client': ^0.1.0
+    peerDependenciesMeta:
+      '@yamf/client':
+        optional: true
+
+  '@yamf/services-auth@0.1.2':
+    resolution: {integrity: sha512-/d9XvvOViogqiMaZ+RqbtmTZuZFdAPHiAZMFIvomPc2BLvvwdILTKYqi+0uG8cNwPSX5mrQP50O3KV81fNJ7Cw==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@yamf/core': ^0.3.2
+      '@yamf/services-cache': ^0.1.2
+
+  '@yamf/services-cache@0.1.2':
+    resolution: {integrity: sha512-wLQNdLWIAKGqBLztz9bJbOMRorliPopgYyw9cbxGNbZYKUWS/89ubnwWr3frpeICcvndVV2cCXTTrOz48Gmmbw==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@yamf/core': ^0.3.2
+
+  '@yamf/services-file-server@0.1.2':
+    resolution: {integrity: sha512-HDnPxRCiRVayg52ZFUasbFEfUOFgVGy5VNVdLEUe5wweJBnLsOx8hP8Ee7egAcXNVeFXRsfrGgqe8iMf0rAzag==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@yamf/core': ^0.3.2
+
+  '@yamf/services-file-upload@0.1.2':
+    resolution: {integrity: sha512-80KPJyFzexyalY5HoNaAZp6bT+6rfPloOKHx4moBN2F0/406ukBs3iD++UAh34yeggK39GS1Yd9Gqk2asxBljQ==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@yamf/core': ^0.3.2
+
+  busboy@1.6.0:
+    resolution: {integrity: sha512-8SFQbg/0hQ9xy3UNTB0YEnsNBbWfhf7RtnzpL7TkBiTBRfrQ9Fxcnz7VJsleJpyp6rVLvXiuORqjlHi5q+PYuA==}
+    engines: {node: '>=10.16.0'}
+
+  streamsearch@1.1.0:
+    resolution: {integrity: sha512-Mcc5wHehp9aXz1ax6bZUyY5afg9u2rv5cqQI3mRrYkGC8rW2hM02jWuwjtL++LS5qinSyhj2QfLyNsuc+VsExg==}
+    engines: {node: '>=10.0.0'}
+
+snapshots:
+
+  '@yamf/client@0.1.0': {}
+
+  '@yamf/core@0.3.2(@yamf/client@0.1.0)':
+    optionalDependencies:
+      '@yamf/client': 0.1.0
+
+  '@yamf/services-auth@0.1.2(@yamf/core@0.3.2(@yamf/client@0.1.0))(@yamf/services-cache@0.1.2(@yamf/core@0.3.2(@yamf/client@0.1.0)))':
+    dependencies:
+      '@yamf/core': 0.3.2(@yamf/client@0.1.0)
+      '@yamf/services-cache': 0.1.2(@yamf/core@0.3.2(@yamf/client@0.1.0))
+
+  '@yamf/services-cache@0.1.2(@yamf/core@0.3.2(@yamf/client@0.1.0))':
+    dependencies:
+      '@yamf/core': 0.3.2(@yamf/client@0.1.0)
+
+  '@yamf/services-file-server@0.1.2(@yamf/core@0.3.2(@yamf/client@0.1.0))':
+    dependencies:
+      '@yamf/core': 0.3.2(@yamf/client@0.1.0)
+
+  '@yamf/services-file-upload@0.1.2(@yamf/core@0.3.2(@yamf/client@0.1.0))':
+    dependencies:
+      '@yamf/core': 0.3.2(@yamf/client@0.1.0)
+      busboy: 1.6.0
+
+  busboy@1.6.0:
+    dependencies:
+      streamsearch: 1.1.0
+
+  streamsearch@1.1.0: {}

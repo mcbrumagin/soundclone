@@ -1,4 +1,4 @@
-import { htmlTags } from 'micro-js-html'
+import { htmlTags } from '@yamf/client'
 import TrackDetailView from './track-detail.js'
 
 const { div, h2, button, a, span, header, i, p, main } = htmlTags

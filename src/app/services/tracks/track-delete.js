@@ -1,11 +1,11 @@
 import path from 'node:path'
 import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3'
-import { envConfig } from 'micro-js'
+import { envConfig } from '@yamf/core'
 import { getTrackMetadata, deleteTrackMetadata } from '../../../lib/metadata-cache.js'
 import { getTrackFilenames } from '../../../lib/track-metadata-model.js'
 import { rawAudioDir, optimizedAudioDir, waveformsDir } from '../../../lib/utils.js'
 import { safeDelete } from '../../../lib/fs-helpers.js'
-import Logger from 'micro-js/logger'
+import Logger from '@yamf/core/logger'
 
 const logger = new Logger({ logGroup: 'track-delete' })
 

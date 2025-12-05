@@ -1,4 +1,4 @@
-import { htmlTags } from 'micro-js-html'
+import { htmlTags } from '@yamf/client'
 import { showAlert } from '../components/modal.js'
 
 const { div, h1, form, input, button } = htmlTags
@@ -15,7 +15,7 @@ export default class LoginView {
       body: JSON.stringify({ authenticate: { user, password } }),
       headers: {
         'Content-Type': 'application/json',
-        'micro-command': 'auth-login'
+        'yamf-command': 'auth-login'
       }
     })
 

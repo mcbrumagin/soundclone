@@ -1,0 +1,28 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@yamf/core':
+        specifier: 0.3.2
+        version: 0.3.2
+
+packages:
+
+  '@yamf/core@0.3.2':
+    resolution: {integrity: sha512-qHbIYROWcnSPJsoN6eT/R0Uyi3tbzI6Bfs6bBFwxtY7VlfEeFRr/beEPu5xxeJqKQmIvxeyWHHOdEyofBv6uGQ==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@yamf/client': ^0.1.0
+    peerDependenciesMeta:
+      '@yamf/client':
+        optional: true
+
+snapshots:
+
+  '@yamf/core@0.3.2': {}

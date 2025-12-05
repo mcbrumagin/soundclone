@@ -1,4 +1,4 @@
-import { next, HttpError } from 'micro-js'
+import { next, HttpError } from '@yamf/core'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { uploadsDir } from '../lib/utils.js'
@@ -53,7 +53,7 @@ export default async function audioStreamService(payload, request, response) {
       headers: request.headers
     })
     
-    // Get the actual HTTP method from micro-js override header
+    // Get the actual HTTP method from @yamf/core override header
     const actualMethod = request.method
     console.log('🔍 Actual HTTP method:', actualMethod)
     

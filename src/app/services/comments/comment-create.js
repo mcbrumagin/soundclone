@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import { getTrackMetadata, mergeAndUpdateTrackMetadata } from '../../../lib/metadata-cache.js'
-import Logger from 'micro-js/logger'
+import Logger from '@yamf/core/logger'
 
 const logger = new Logger({ logGroup: 'comment-create' })
 

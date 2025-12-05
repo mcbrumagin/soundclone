@@ -1,6 +1,10 @@
 {
   "dependencies": {
-    "micro-js": "^0.2.13",
-    "micro-js-html": "^0.0.8"
+    "@yamf/client": "0.1.0",
+    "@yamf/core": "0.3.2",
+    "@yamf/services-auth": "0.1.2",
+    "@yamf/services-cache": "0.1.2",
+    "@yamf/services-file-server": "0.1.2",
+    "@yamf/services-file-upload": "0.1.2"
   }
 }

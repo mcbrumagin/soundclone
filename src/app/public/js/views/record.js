@@ -1,4 +1,4 @@
-import { htmlTags } from 'micro-js-html'
+import { htmlTags } from '@yamf/client'
 import { uploadTrack, getTracks } from '../api.js'
 import { showAlert, showConfirm } from '../components/modal.js'
 

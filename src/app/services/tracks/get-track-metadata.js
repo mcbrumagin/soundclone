@@ -1,6 +1,6 @@
 import { getTrackMetadata } from '../../../lib/metadata-cache.js'
-import { next, HttpError } from 'micro-js'
-import Logger from 'micro-js/logger'
+import { next, HttpError } from '@yamf/core'
+import Logger from '@yamf/core/logger'
 
 const logger = new Logger({ logGroup: 'get-track-metadata' })
 

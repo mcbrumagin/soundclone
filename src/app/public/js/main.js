@@ -1,4 +1,4 @@
-import { htmlTags } from 'micro-js-html'
+import { htmlTags } from '@yamf/client'
 import renderHelper from './render-helper.js'
 // Removed router import - using simple hashchange handler
 import Navigation from './components/navigation.js'
@@ -136,7 +136,7 @@ const bootstrap = async () => {
       method: 'POST',
       body: null,
       headers: {
-        'micro-command': 'auth-refresh'
+        'yamf-command': 'auth-refresh'
       }
     })
 

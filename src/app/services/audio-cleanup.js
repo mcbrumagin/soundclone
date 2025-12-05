@@ -1,6 +1,6 @@
-import { createSubscriptionService, callService } from 'micro-js'
+import { createSubscriptionService, callService } from '@yamf/core'
 import { mergeAndUpdateTrackMetadata, getTrackMetadata } from '../../lib/metadata-cache.js'
-import Logger from 'micro-js/logger'
+import Logger from '@yamf/core/logger'
 
 const logger = new Logger({ logGroup: 'audio-cleanup' })
 

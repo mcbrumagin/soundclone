@@ -6,10 +6,10 @@ import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 
 import { rawAudioDir, optimizedAudioDir, waveformsDir } from '../../../lib/utils.js'
-import { envConfig } from 'micro-js'
+import { envConfig } from '@yamf/core'
 import { setTrackMetadata } from '../../../lib/metadata-cache.js'
 import { ensureDir, getFileSize } from '../../../lib/fs-helpers.js'
-import Logger from 'micro-js/logger'
+import Logger from '@yamf/core/logger'
 
 const logger = new Logger({ logGroup: 's3-initialize' })
 

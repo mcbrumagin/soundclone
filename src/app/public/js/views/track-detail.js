@@ -1,4 +1,4 @@
-import { htmlTags } from 'micro-js-html'
+import { htmlTags } from '@yamf/client'
 import { getTrack, updateTrack, deleteTrack, addComment, updateComment, deleteComment } from '../api.js'
 import { showAlert, showConfirm, showPrompt, showTextareaPrompt, showEditTrackModal } from '../components/modal.js'
 
