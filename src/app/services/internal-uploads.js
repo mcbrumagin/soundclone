@@ -1,9 +1,9 @@
-import createFileUploadService from 'micro-js/file-upload-service'
-import { publishMessage } from 'micro-js'
+import createFileUploadService from '@yamf/services-file-upload'
+import { publishMessage } from '@yamf/core'
 import { mergeAndUpdateTrackMetadata } from '../../lib/metadata-cache.js'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import Logger from 'micro-js/logger'
+import Logger from '@yamf/core/logger'
 import { optimizedAudioDir, waveformsDir } from '../../lib/utils.js'
 
 const logger = new Logger({ logGroup: 'internal-uploads' })
@@ -19,7 +19,7 @@ export async function createTranscodedAudioUploadService() {
     uploadDir: optimizedAudioDir,
     urlPathPrefix: '/audio/optimized',
     publishFileEvents: true,
-    updateChannel: 'micro:file-updated',
+    updateChannel: 'yamf:file-updated',
     fileFieldName: 'file',
     textFields: ['originalName', 'trackId'],
     getFileName: (originalName, formData) => {
@@ -81,7 +81,7 @@ export async function createWaveformUploadService() {
     uploadDir: waveformsDir,
     urlPathPrefix: '/images/waveforms',
     publishFileEvents: true,
-    updateChannel: 'micro:file-updated',
+    updateChannel: 'yamf:file-updated',
     fileFieldName: 'file',
     textFields: ['originalName', 'trackId'],
     getFileName: (originalName, formData) => {

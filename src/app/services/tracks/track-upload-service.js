@@ -1,11 +1,11 @@
-import createFileUploadService, { validators } from 'micro-js/file-upload-service'
-import { publishMessage } from 'micro-js'
+import createFileUploadService, { validators } from '@yamf/services-file-upload'
+import { publishMessage } from '@yamf/core'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { rawAudioDir } from '../../../lib/utils.js'
 import { setTrackMetadata } from '../../../lib/metadata-cache.js'
 import { createTrackMetadata, createProcessingMessage } from '../../../lib/track-metadata-model.js'
-import Logger from 'micro-js/logger'
+import Logger from '@yamf/core/logger'
 
 const logger = new Logger({ logGroup: 'track-upload-service' })
 

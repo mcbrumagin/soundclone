@@ -65,9 +65,9 @@ Upload → audio-metadata → audio-transcode → waveform-generator → audio-c
 Services communicate via pub/sub events:
 
 ### Published Events
-- `micro:file-uploaded` - New file uploaded
-- `micro:file-updated` - File created or modified
-- `micro:file-deleted` - File deleted
+- `yamf:file-uploaded` - New file uploaded
+- `yamf:file-updated` - File created or modified
+- `yamf:file-deleted` - File deleted
 - `audioMetadataComplete` - Metadata extraction complete
 - `audioTranscodeComplete` - Transcoding complete
 - `waveformComplete` - Waveform generation complete
@@ -75,14 +75,14 @@ Services communicate via pub/sub events:
 
 ### Subscribed Events
 - **s3-backup.js** listens to:
-  - `micro:file-updated` → uploads file to S3
-  - `micro:file-deleted` → deletes file from S3
+  - `yamf:file-updated` → uploads file to S3
+  - `yamf:file-deleted` → deletes file from S3
 
 - **audio-cleanup.js** listens to:
-  - `micro:file-uploaded` → starts processing pipeline
+  - `yamf:file-uploaded` → starts processing pipeline
 
 - **music-meta.js** listens to:
-  - `micro:file-uploaded` → extracts metadata
+  - `yamf:file-uploaded` → extracts metadata
 
 - **audio-transcode.js** listens to:
   - `audioMetadataComplete` → transcodes audio
@@ -112,7 +112,7 @@ data/
 ### Example Service Template
 
 ```javascript
-import { subscribe, publishMessage } from 'micro-js'
+import { subscribe, publishMessage } from '@yamf/core'
 
 export default async function initializeMyService() {
   console.log('Initializing my service')

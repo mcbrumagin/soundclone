@@ -1,8 +1,8 @@
 import path from 'node:path'
 import { spawn } from 'node:child_process'
-import { createSubscriptionService, publishMessage } from 'micro-js'
+import { createSubscriptionService, publishMessage } from '@yamf/core'
 import { mergeAndUpdateTrackMetadata } from '../lib/metadata-cache.js'
-import Logger from 'micro-js/logger'
+import Logger from '@yamf/core/logger'
 
 const logger = new Logger({ logGroup: 'music-meta' })
 
@@ -12,7 +12,7 @@ const logger = new Logger({ logGroup: 'music-meta' })
  * @returns {Promise<Object>} Audio metadata
  */
 async function probeAudioMetadata(fileUrl) {
-  fileUrl = process.env.MICRO_REGISTRY_URL + fileUrl
+  fileUrl = process.env.YAMF_REGISTRY_URL + fileUrl
   logger.warn('probeAudioMetadata called with fileUrl:', fileUrl)
   return new Promise((resolve) => {
     const ffprobe = spawn('ffprobe', [

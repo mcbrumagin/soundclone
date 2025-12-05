@@ -1,4 +1,4 @@
-import { callService, publishMessage, Logger } from 'micro-js'
+import { callService, publishMessage, Logger } from '@yamf/core'
 
 const logger = new Logger({ logGroup: 'metadata-cache' })
 

@@ -16,9 +16,9 @@ import numpy as np
 from dataclasses import dataclass
 
 # Add parent directory to path to import microjs
-# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../../micro-jslanguages/python'))
-
-from microjs import create_subscription_sync
+# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../../yamf-jslanguages/python'))
+# TODO need to finalize and publish yamf python package
+from yamf import create_subscription_sync
 
 import traceback
 
@@ -109,7 +109,7 @@ key_estimator = KeyEstimator() # singleton
 
 
 # Set registry URL
-os.environ['MICRO_REGISTRY_URL'] = os.getenv('MICRO_REGISTRY_URL', 'http://localhost:3000')
+os.environ['YAMF_REGISTRY_URL'] = os.getenv('YAMF_REGISTRY_URL', 'http://localhost:3000')
 
 async def message_handler(message):
     """Handler for channel messages"""
@@ -162,7 +162,7 @@ async def message_handler(message):
 
 if __name__ == '__main__':
     print("Starting pubsub-subscriber service...")
-    print(f"Registry URL: {os.environ['MICRO_REGISTRY_URL']}")
+    print(f"Registry URL: {os.environ['YAMF_REGISTRY_URL']}")
     print("\nThis service subscribes to the 'processUploadedAudio' channel")
     
     # Create and register the service

@@ -1,7 +1,9 @@
-export MICRO_REGISTRY_URL=http://localhost:4000
+export YAMF_REGISTRY_URL=http://localhost:4000
 export ENVIRONMENT=dev
+
+# NOTE most of these are overridden in src/app
 # export DISABLE_ALL_CUSTOM_LOGS=true
-export LOG_LEVEL=info
+export LOG_LEVEL=debug
 export LOG_INCLUDE_LINES=true
 export LOG_EXCLUDE_FULL_PATH_IN_LOG_LINES=true
 
@@ -12,7 +14,7 @@ export S3_PREFIX=soundclone-local/
 export ADMIN_USER=admin
 export ADMIN_SECRET=password
 
-npm start
+cd src/app && npm start
 
 # Commented out for now, restarts too much (need nodemon config update)
 # if npm list -g | grep -q "nodemon"; then

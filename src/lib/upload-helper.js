@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { callService } from 'micro-js'
-import Logger from 'micro-js/logger'
+import { callService } from '@yamf/core'
+import Logger from '@yamf/core/logger'
 
 const logger = new Logger({ logGroup: 'upload-helper' })
 

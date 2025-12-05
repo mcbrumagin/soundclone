@@ -216,7 +216,7 @@ const tracks = await getAllTrackMetadata()
 ### Service with Logging and File Operations
 
 ```javascript
-import Logger from 'micro-js/logger'
+import Logger from '@yamf/core/logger'
 import { verifyFile, safeDelete } from '../lib/fs-helpers.js'
 import { waitFor } from '../lib/async-helpers.js'
 
@@ -240,7 +240,7 @@ async function processFile(filePath) {
 ### Batch Processing with Progress
 
 ```javascript
-import Logger from 'micro-js/logger'
+import Logger from '@yamf/core/logger'
 import { createProgressLogger } from '../lib/logger-helpers.js'
 import { batchExecute } from '../lib/async-helpers.js'
 import { findFiles } from '../lib/fs-helpers.js'

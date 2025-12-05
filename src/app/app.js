@@ -2,7 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 
-// ---micro core-----------------------------------------------------
+// ---yamf core-----------------------------------------------------
 import {
   registryServer,
   createRoutes,
@@ -10,13 +10,15 @@ import {
   callService,
   publishMessage,
   HttpError,
-  createCacheService,
-  createAuthService,
-  createStaticFileService,
   envConfig,
   overrideConsoleGlobally,
   Logger,
-} from 'micro-js'
+} from '@yamf/core'
+
+// ---yamf services-------------------------------------------------
+import createStaticFileService from '@yamf/services-file-server'
+import createAuthService from '@yamf/services-auth'
+import createCacheService from '@yamf/services-cache'
 
 // ---local services-------------------------------------------------
 import initializeAudioCleanupService from './services/audio-cleanup.js'
@@ -61,8 +63,8 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 
-const MICRO_REGISTRY_URL = envConfig.getRequired('MICRO_REGISTRY_URL')
-const PORT = MICRO_REGISTRY_URL.split(':')[2]
+const YAMF_REGISTRY_URL = envConfig.getRequired('YAMF_REGISTRY_URL')
+const PORT = YAMF_REGISTRY_URL.split(':')[2]
 const NODE_MODULES_DIR = envConfig.get('NODE_MODULES_DIR', '../node_modules')
 
 const ENVIRONMENT = envConfig.get('ENVIRONMENT', 'dev').toLowerCase()
@@ -121,7 +123,7 @@ async function startServer() {
         serviceName: 'track-upload-service',
         useAuthService: 'auth-service',
         publishFileEvents: true,
-        updateChannel: 'micro:file-updated',
+        updateChannel: 'yamf:file-updated',
         urlPathPrefix: '/audio/raw'
       }),
       
@@ -131,8 +133,8 @@ async function startServer() {
         autoRefresh: {
           mode: 'pubsub',
           // doesn't listen to the initial upload
-          updateChannel: 'micro:file-updated',
-          deleteChannel: 'micro:file-deleted',
+          updateChannel: 'yamf:file-updated',
+          deleteChannel: 'yamf:file-deleted',
         },
         fileMap: {
           '/': 'index.html',
@@ -142,19 +144,19 @@ async function startServer() {
           '/audio/raw/*': '../../../data/audio/raw',
           '/audio/optimized/*': '../../../data/audio/optimized',
           '/images/waveforms/*': '../../../data/images/waveforms',
-          '/micro-js-html/*': path.join(NODE_MODULES_DIR, 'micro-js-html/src')
+          '/@yamf/client/*': path.join(NODE_MODULES_DIR, '@yamf/client/src')
         }
       })
     }
 
     if (isLocal || isDev) {
       routeMap['/debug'] = async function debug(payload) {
-        let response = await fetch(MICRO_REGISTRY_URL, {
+        let response = await fetch(YAMF_REGISTRY_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'micro-command': 'service-lookup',
-            'micro-service-name': '*'
+            'yamf-command': 'service-lookup',
+            'yamf-service-name': '*'
           },
           body: JSON.stringify(payload)
         })

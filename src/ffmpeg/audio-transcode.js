@@ -2,9 +2,9 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { createSubscriptionService, publishMessage } from 'micro-js'
+import { createSubscriptionService, publishMessage } from '@yamf/core'
 import { uploadFile } from '../lib/upload-helper.js'
-import Logger from 'micro-js/logger'
+import Logger from '@yamf/core/logger'
 import { mergeAndUpdateTrackMetadata } from '../lib/metadata-cache.js'
 import { retry } from '../lib/async-helpers.js'
 import { getTrackFilenames } from '../lib/track-metadata-model.js'
@@ -81,7 +81,7 @@ async function transcodeToOpus(inputUrl, outputFileName) {
   const outputPath = path.join(tempDir, outputFileName)
   
   return new Promise((resolve) => {
-    inputUrl = process.env.MICRO_REGISTRY_URL + inputUrl
+    inputUrl = process.env.YAMF_REGISTRY_URL + inputUrl
     logger.info(`Starting transcode: ${inputUrl} → ${outputFileName}`)
     
     // Opus encoding with VBR at ~160kbps (transparent quality)

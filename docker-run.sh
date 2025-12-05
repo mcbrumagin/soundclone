@@ -93,8 +93,8 @@ docker run -d \
   --name $MAIN_CONTAINER \
   --network $NETWORK_NAME \
   -p $MAIN_PORT:10000 \
-  -e MICRO_REGISTRY_URL="http://$MAIN_CONTAINER:10000" \
-  -e MICRO_REGISTRY_TOKEN=test-registry-token \
+  -e YAMF_REGISTRY_URL="http://$MAIN_CONTAINER:10000" \
+  -e YAMF_REGISTRY_TOKEN=test-registry-token \
   -e ENVIRONMENT="$ENVIRONMENT" \
   -e NODE_MODULES_DIR="../../node_modules" \
   -e LOG_LEVEL="$LOG_LEVEL" \
@@ -138,9 +138,9 @@ docker run -d \
   --name $FFMPEG_CONTAINER \
   --network $NETWORK_NAME \
   -p $FFMPEG_PORT:11000 \
-  -e MICRO_REGISTRY_URL="http://$MAIN_CONTAINER:10000" \
-  -e MICRO_REGISTRY_TOKEN=test-registry-token \
-  -e MICRO_SERVICE_URL="http://$FFMPEG_CONTAINER:11000" \
+  -e YAMF_REGISTRY_URL="http://$MAIN_CONTAINER:10000" \
+  -e YAMF_REGISTRY_TOKEN=test-registry-token \
+  -e YAMF_SERVICE_URL="http://$FFMPEG_CONTAINER:11000" \
   -e ENVIRONMENT="$ENVIRONMENT" \
   -e LOG_LEVEL="$LOG_LEVEL" \
   soundclone-ffmpeg:latest

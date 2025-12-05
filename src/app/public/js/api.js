@@ -1,40 +1,7 @@
 // Service registry endpoint
+// TODO Gateway url
 const SERVICE_REGISTRY_URL = window.location.origin
 
-// TODO add to micro-js-html?
-// Helper function to call micro-js services
-// const callService = async (serviceName, payload = {}) => {
-//   console.log('callService', serviceName, payload)
-//   const response = await fetch(SERVICE_REGISTRY_URL, {
-//     method: 'POST',
-//     headers: {
-//       'Content-Type': 'application/json'
-//     },
-//     body: JSON.stringify({
-//       call: {
-//         name: serviceName,
-//         payload: payload
-//       }
-//     })
-//   })
-  
-//   if (!response.ok) {
-//     throw new Error(`Service call failed: ${response.status} ${response.statusText}`)
-//   }
-  
-//   // Handle different content types
-//   const contentType = response.headers.get('content-type')
-//   if (contentType && contentType.includes('application/json')) {
-//     const json = await response.json()
-//     if (!json.success && json.message) {
-//       throw new Error(json.message)
-//     }
-//     return json
-//   } else {
-//     // For binary data like audio files
-//     return response
-//   }
-// }
 
 const callService = async (serviceName, payload = {}) => {
   console.log('callService', serviceName, payload)
@@ -52,8 +19,8 @@ const callService = async (serviceName, payload = {}) => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'micro-command': 'service-call',
-      'micro-service-name': serviceName,
+      'yamf-command': 'service-call',
+      'yamf-service-name': serviceName,
       ...headers
     },
     body: JSON.stringify(body)
@@ -173,7 +140,7 @@ export const uploadTrack = async (audioFile, title, description, onProgress = nu
     
     // Send to the upload route
     xhr.open('POST', `${SERVICE_REGISTRY_URL}/uploadTrack`)
-    xhr.setRequestHeader('micro-auth-token', appState.accessToken)
+    xhr.setRequestHeader('yamf-auth-token', appState.accessToken)
     xhr.send(formData)
   })
 }
@@ -181,7 +148,7 @@ export const uploadTrack = async (audioFile, title, description, onProgress = nu
 export const updateTrack = async (trackId, data) => {
   const json = await callService('updateTrack', {
     body: { trackId, ...data },
-    headers: { 'micro-auth-token': appState.accessToken }
+    headers: { 'yamf-auth-token': appState.accessToken }
   })
   return json.track
 }
@@ -189,7 +156,7 @@ export const updateTrack = async (trackId, data) => {
 export const deleteTrack = async trackId => {
   const json = await callService('deleteTrack', {
     body: { trackId },
-    headers: { 'micro-auth-token': appState.accessToken }
+    headers: { 'yamf-auth-token': appState.accessToken }
   })
   return json
 }
@@ -199,7 +166,7 @@ export const addComment = async (trackId, text) => {
   console.log('addComment', trackId, text)
   const json = await callService('createComment', {
     body: { trackId, text },
-    headers: { 'micro-auth-token': appState.accessToken }
+    headers: { 'yamf-auth-token': appState.accessToken }
   })
   return json.comment
 }
@@ -207,7 +174,7 @@ export const addComment = async (trackId, text) => {
 export const updateComment = async (trackId, commentId, text) => {
   const json = await callService('updateComment', {
     body: { trackId, commentId, text },
-    headers: { 'micro-auth-token': appState.accessToken }
+    headers: { 'yamf-auth-token': appState.accessToken }
   })
   return json.comment
 }
@@ -215,7 +182,7 @@ export const updateComment = async (trackId, commentId, text) => {
 export const deleteComment = async (trackId, commentId) => {
   const json = await callService('deleteComment', {
     body: { trackId, commentId },
-    headers: { 'micro-auth-token': appState.accessToken }
+    headers: { 'yamf-auth-token': appState.accessToken }
   })
   return json
 }

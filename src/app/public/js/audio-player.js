@@ -1,4 +1,4 @@
-import { htmlTags } from 'micro-js-html'
+import { htmlTags } from '@yamf/client'
 const { div, input, button, span } = htmlTags
 
 class AudioPlayer {

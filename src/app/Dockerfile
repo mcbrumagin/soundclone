@@ -21,7 +21,7 @@ COPY --from=build /soundclone/node_modules/ ./node_modules/
 # Copy shared library files from build context
 COPY --from=shared-lib . ./lib/
 
-ENV MICRO_REGISTRY_URL="http://localhost:10000"
+ENV YAMF_REGISTRY_URL="http://localhost:10000"
 ENV ADMIN_USER="admin"
 ENV ADMIN_SECRET="password"
 

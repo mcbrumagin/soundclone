@@ -2,7 +2,7 @@ import http from 'http'
 import initializeMusicMetadataProcessor from './music-meta.js'
 import initializeAudioTranscodeService from './audio-transcode.js'
 import initializeWaveformGenerator from './waveform-generator.js'
-import Logger from 'micro-js/logger'
+import Logger from '@yamf/core/logger'
 
 const logger = new Logger({ logGroup: 'ffmpeg-service' })
 
@@ -86,8 +86,8 @@ async function waitForRegistry(registryUrl, maxAttempts = 60, intervalMs = 1000)
 
 async function main() {
   logger.info('Starting FFmpeg service...')
-  logger.info(`Registry URL: ${process.env.MICRO_REGISTRY_URL}`)
-  logger.info(`Service URL: ${process.env.MICRO_SERVICE_URL}`)
+  logger.info(`Registry URL: ${process.env.YAMF_REGISTRY_URL}`)
+  logger.info(`Service URL: ${process.env.YAMF_SERVICE_URL}`)
   logger.info(`Environment: ${process.env.ENVIRONMENT || 'local'}`)
 
   // Start health server immediately (before service initialization)
@@ -96,11 +96,11 @@ async function main() {
   serviceState.status = 'waiting_for_registry'
 
   // Wait for registry to be available (for dev/prod deployments)
-  const registryUrl = process.env.MICRO_REGISTRY_URL
+  const registryUrl = process.env.YAMF_REGISTRY_URL
   if (registryUrl) {
     await waitForRegistry(registryUrl)
   } else {
-    logger.warn('No MICRO_REGISTRY_URL set, skipping registry health check')
+    logger.warn('No YAMF_REGISTRY_URL set, skipping registry health check')
   }
 
   // Initialize services - they will register with the main registry

@@ -14,8 +14,8 @@ COPY harmonic-analyzer.py .
 
 RUN pip install --no-cache /wheels/*
 
-ENV MICRO_REGISTRY_URL=http://localhost:10000
-ENV MICRO_SERVICE_URL=http://localhost:11000
+ENV YAMF_REGISTRY_URL=http://localhost:10000
+ENV YAMF_SERVICE_URL=http://localhost:11000
 
 EXPOSE 11000
 

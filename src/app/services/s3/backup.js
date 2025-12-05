@@ -1,11 +1,11 @@
-import { createService, createSubscriptionService, publishMessage } from 'micro-js'
+import { createService, createSubscriptionService, publishMessage } from '@yamf/core'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-import { envConfig } from 'micro-js'
+import { envConfig } from '@yamf/core'
 import { rawAudioDir, optimizedAudioDir, waveformsDir } from '../../../lib/utils.js'
-import Logger from 'micro-js/logger'
+import Logger from '@yamf/core/logger'
 
 const logger = new Logger({ logGroup: 's3-backup' })
 
@@ -257,8 +257,8 @@ export default async function initializeS3BackupService() {
   
   // Subscribe to file events
   let s3BackupService = await createSubscriptionService('s3-backup', {
-    'micro:file-updated': handleFileUpdated,
-    'micro:file-deleted': handleFileDeleted,
+    'yamf:file-updated': handleFileUpdated,
+    'yamf:file-deleted': handleFileDeleted,
     'track-metadata-updated': handleTrackMetadataUpdated,
     'track-metadata-deleted': handleTrackMetadataDeleted
   })
